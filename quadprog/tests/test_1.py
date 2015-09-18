@@ -50,3 +50,6 @@ def test_2():
     b = -1000 * np.ones(1)
     verify(G, a, C, b)
     verify(G, a)
+
+test_1()
+test_2()

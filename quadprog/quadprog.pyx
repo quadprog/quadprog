@@ -12,8 +12,16 @@ cdef extern:
 def solve_qp(double[:, :] G, double[:] a, double[:, :] C=None, double[:] b=None, int meq=0, factorized=False):
     """Solve a strictly convex quadratic program
 
-    Minimize     1/2 x^T G x + a^T x
+    Minimize     1/2 x^T G x - a^T x
     Subject to   C.T x >= b
+
+    This routine uses the the Goldfarb/Idnani dual algorithm [1].
+
+    References
+    ---------
+    ... [1] D. Goldfarb and A. Idnani (1983). A numerically stable dual
+        method for solving strictly convex quadratic programs.
+        Mathematical Programming, 27, 1-33.
 
     Parameters
     ----------
