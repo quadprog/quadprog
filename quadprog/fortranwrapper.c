@@ -35,6 +35,6 @@ void qpgen2(double* dmat, double* dvec,int* fddmat,int* n,
             double* amat, double* bvec, int* fdamat,
             int* q,int* meq, int* iact, int* nact, int* iter,
             double* work, int* ierr) {
-    // F_FUNC(qpgen2,QPGEN2)(dmat, dvec, fddmat, n, sol, lagr, crval,
-    //     amat, bvec, fdamat, q, meq, iact, nact, iter, work, ierr);
+    F_FUNC(qpgen2,QPGEN2)(dmat, dvec, fddmat, n, sol, lagr, crval,
+        amat, bvec, fdamat, q, meq, iact, nact, iter, work, ierr);
 }

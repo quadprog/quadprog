@@ -25,7 +25,7 @@ c                A2^T x >= b2
 c
 c  the matrix D is assumed to be positive definite.  Especially,
 c  w.l.o.g. D is assumed to be symmetric.
-c  
+c
 c  Input parameter:
 c  dmat   nxn matrix, the matrix D from above (dp)
 c         *** WILL BE DESTROYED ON EXIT ***
@@ -49,7 +49,7 @@ c  bvec   qx1 vector, the vector of constants b in the constraints (dp)
 c         [ b = (b1^T b2^T)^T ]
 c         *** ENTRIES CORRESPONDING TO EQUALITY CONSTRAINTS MAY HAVE
 c             CHANGED SIGNES ON EXIT ***
-c  fdamat the first dimension of amat as declared in the calling program. 
+c  fdamat the first dimension of amat as declared in the calling program.
 c         fdamat >= n !!
 c  q      integer, the number of constraints.
 c  meq    integer, the number of equality constraints, 0 <= meq <= q.
@@ -61,11 +61,11 @@ c
 c  Output parameter:
 c  sol   nx1 the final solution (x in the notation above)
 c  lagr  qx1 the final Lagrange multipliers
-c  crval scalar, the value of the criterion at the minimum      
+c  crval scalar, the value of the criterion at the minimum
 c  iact  qx1 vector, the constraints which are active in the final
 c        fit (int)
 c  nact  scalar, the number of constraints active in the final fit (int)
-c  iter  2x1 vector, first component gives the number of "main" 
+c  iter  2x1 vector, first component gives the number of "main"
 c        iterations, the second one says how many constraints were
 c        deleted after they became active
 c  ierr  integer, error code on exit, if
@@ -78,10 +78,10 @@ c  Working space:
 c  work  vector with length at least 2*n+r*(r+5)/2 + 2*q +1
 c        where r=min(n,q)
 c
-      subroutine qpgen2(dmat, dvec, fddmat, n, sol, lagr, crval, amat, 
-     *     bvec, fdamat, q, meq, iact, nact, iter, work, ierr)  
+      subroutine qpgen2(dmat, dvec, fddmat, n, sol, lagr, crval, amat,
+     *     bvec, fdamat, q, meq, iact, nact, iter, work, ierr)
       implicit none
-      integer n, i, j, l, l1, 
+      integer n, i, j, l, l1,
      *     info, q, iact(*), iter(*), it1,
      *     ierr, nact, iwzv, iwrv, iwrm, iwsv, iwuv, nvl,
      *     r, fdamat, iwnbv, meq, fddmat
@@ -102,7 +102,7 @@ c
       tmpb = 1.0d0 + 0.2d0*vsmall
       if( tmpa .LE. 1.0d0 ) goto 1
       if( tmpb .LE. 1.0d0 ) goto 1
-c 
+c
 c store the initial dvec to calculate below the unconstrained minima of
 c the critical value.
 c
@@ -128,8 +128,8 @@ c
          call dposl(dmat,fddmat,n,dvec)
          call dpori(dmat,fddmat,n)
       else
-c        
-c Matrix D is already factorized, so we have to multiply d first with 
+c
+c Matrix D is already factorized, so we have to multiply d first with
 c R^-T and then with R^-1.  R^-1 is stored in the upper half of the
 c array dmat.
 c
@@ -150,7 +150,7 @@ c
 c set lower triangular of dmat to zero, store dvec in sol and
 c calculate value of the criterion at unconstrained minima
 c
-      crval = 0.d0   
+      crval = 0.d0
       do 30 j=1,n
          sol(j)  = dvec(j)
          crval   = crval + work(j)*sol(j)
@@ -186,7 +186,7 @@ c
       iter(2) = 0
  50   continue
 c
-c start a new iteration      
+c start a new iteration
 c
       iter(1) = iter(1)+1
 c
@@ -223,14 +223,14 @@ c
       do 70 i=1,nact
          work(iwsv+iact(i)) = 0.d0
  70   continue
-c 
+c
 c we weight each violation by the number of non-zero elements in the
 c corresponding row of A. then we choose the violated constraint which
 c has maximal absolute value, i.e., the minimum.
-c by obvious commenting and uncommenting we can choose the strategy to      
+c by obvious commenting and uncommenting we can choose the strategy to
 c take always the first constraint which is violated. ;-)
 c
-      nvl = 0 
+      nvl = 0
       temp = 0.d0
       do 71 i=1,q
          if (work(iwsv+i) .LT. temp*work(iwnbv+i)) then
@@ -248,7 +248,7 @@ c         endif
  73      continue
          goto 999
       endif
-c     
+c
 c calculate d=J^Tn^+ where n^+ is the normal vector of the violated
 c constraint. J is stored in dmat in this implementation!!
 c if we drop a constraint, we have to jump back here.
@@ -270,11 +270,11 @@ c
  90   continue
       do 92 j=nact+1,n
          do 93 i=1,n
-            work(l1+i) = work(l1+i) + dmat(i,j)*work(j) 
+            work(l1+i) = work(l1+i) + dmat(i,j)*work(j)
  93      continue
  92   continue
 c
-c and r = R^{-1} d_1, check also if r has positive elements (among the 
+c and r = R^{-1} d_1, check also if r has positive elements (among the
 c entries corresponding to inequalities constraints).
 c
       t1inf = .TRUE.
@@ -297,7 +297,7 @@ c
 c if r has positive elements, find the partial step length t1, which is
 c the maximum step in dual space without violating dual feasibility.
 c it1  stores in which component t1, the min of u/r, occurs.
-c 
+c
       if ( .NOT. t1inf) then
          t1   = work(iwuv+it1)/work(iwrv+it1)
          do 100 i=1,nact
@@ -309,7 +309,7 @@ c
                it1  = i
             endif
  100     continue
-      endif 
+      endif
 c
 c test if the z vector is equal to zero
 c
@@ -318,12 +318,12 @@ c
          sum = sum + work(i)*work(i)
  110  continue
       if (abs(sum) .LE. vsmall) then
-c         
+c
 c No step in primal space such that the new constraint becomes
 c feasible. Take step in dual space and drop a constant.
-c     
+c
          if (t1inf) then
-c            
+c
 c No step in dual space possible either, problem is not solvable
 c
             ierr = 1
@@ -372,7 +372,7 @@ c
 c
 c if it was a full step, then we check wheter further constraints are
 c violated otherwise we can drop the current constraint and iterate once
-c more 
+c more
          if(t2min) then
 c
 c we took a full step. Thus add constraint nvl to the list of active
@@ -395,7 +395,7 @@ c row of R.
 c Otherwise we use Givens transformations to turn the vector d(nact:n)
 c into a multiple of the first unit vector. That multiple goes into the
 c last element of the new row of R and J is accordingly updated by the
-c Givens transformations. 
+c Givens transformations.
 c
             if (nact .EQ. n) then
                work(l) = work(n)
@@ -413,15 +413,15 @@ c
                   temp = sign(gc*sqrt(1+gs*gs/(gc*gc)), work(i-1))
                   gc   = work(i-1)/temp
                   gs   = work(i)/temp
-c 
+c
 c The Givens rotation is done with the matrix (gc gs, gs -gc).
 c If gc is one, then element (i) of d is zero compared with element
-c (l1-1). Hence we don't have to do anything. 
-c If gc is zero, then we just have to switch column (i) and column (i-1) 
+c (l1-1). Hence we don't have to do anything.
+c If gc is zero, then we just have to switch column (i) and column (i-1)
 c of J. Since we only switch columns in J, we have to be careful how we
 c update d depending on the sign of gs.
 c Otherwise we have to apply the Givens rotation to these columns.
-c The i-1 element of d has to be updated to temp.                  
+c The i-1 element of d has to be updated to temp.
 c
                   if (gc .EQ. 1.d0) goto 160
                   if (gc .EQ. 0.d0) then
@@ -441,7 +441,7 @@ c
  180                 continue
                   endif
  160           continue
-c     
+c
 c l is still pointing to element (nact,nact) of the matrix R.
 c So store d(nact) in R(nact,nact)
                work(l) = work(nact)
@@ -501,7 +501,7 @@ c
       temp = sign(gc*sqrt(1+gs*gs/(gc*gc)), work(l1-1))
       gc   = work(l1-1)/temp
       gs   = work(l1)/temp
-c 
+c
 c The Givens rotatin is done with the matrix (gc gs, gs -gc).
 c If gc is one, then element (it1+1,it1+1) of R is zero compared with
 c element (it1,it1+1). Hence we don't have to do anything.
@@ -549,7 +549,7 @@ c
          l  = l+1
          l1 = l1+1
  730  continue
-c      
+c
 c update vector u and iact as necessary
 c Continue with updating the matrices J and R
 c

@@ -1,2 +1,6 @@
 quadprog/quadprog.cpp
 build
+quadprog.so
+quadprog.egg-info/
+dist/
+quadprog/tests/__pycache__/
