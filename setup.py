@@ -48,7 +48,6 @@ extensions = [
                            'quadprog/daxpy.f', 'quadprog/ddot.f',
                            'quadprog/dscal.f',
                            'quadprog/fortranwrapper.c'],
-              include_dirs=[np.get_include()],
               language='c++'),
 ]
 
