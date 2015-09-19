@@ -8,7 +8,7 @@ before_install:
   - conda update --yes conda
 
 install:
-    - conda install -y numpy nose
+    - conda install -y numpy nose cython
     - python setup.py install
 
 script:
