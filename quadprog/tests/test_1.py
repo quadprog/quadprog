@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.optimize
+import scipy.stats
 from quadprog import solve_qp
 
 def solve_qp_scipy(G, a, C, b, meq=0):
@@ -48,5 +49,15 @@ def test_2():
     a = np.array([0, 0, 0], dtype=np.double)
     C = np.ones((3, 1))
     b = -1000 * np.ones(1)
+    verify(G, a, C, b)
+    verify(G, a)
+
+
+def test_3():
+    random = np.random.RandomState(0)
+    G = scipy.stats.wishart(scale=np.eye(3,3), seed=random).rvs()
+    a = random.randn(3)
+    C = random.randn(3, 2)
+    b = random.randn(2)
     verify(G, a, C, b)
     verify(G, a)

@@ -77,10 +77,10 @@ def solve_qp(double[:, :] G, double[:] a, double[:, :] C=None, double[:] b=None,
     if len(b) != m1:
         raise ValueError('The number of columns of C must match the length of b. Received C as (%d, %d) and b as (%d,)' % (n2, m1, len(b)))
 
-    cdef double[::1, :] G_ = np.asarray(G, order='F')
-    cdef double[::1, :] C_ = np.asarray(C, order='F')
-    cdef double[::1] a_ = np.asarray(a, order='F')
-    cdef double[::1] b_ = np.asarray(b, order='F')
+    cdef double[::1, :] G_ = np.array(G, copy=True, order='F')
+    cdef double[::1, :] C_ = np.array(C, copy=True, order='F')
+    cdef double[::1] a_ = np.array(a, copy=True, order='F')
+    cdef double[::1] b_ = np.array(b, copy=True, order='F')
     cdef double[::1] sol = np.zeros(n1)
     cdef double[::1] lagr = np.zeros(m1)
     cdef double crval = 0
