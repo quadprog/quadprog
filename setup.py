@@ -1,19 +1,16 @@
 """Strictly Convex Quadratic Programming Solver
 
 Minimize     1/2 x^T G x - a^T x
+
 Subject to   C.T x >= b
 
 This routine uses the the Goldfarb/Idnani dual algorithm [1].
 
 References
----------
-... [1] D. Goldfarb and A. Idnani (1983). A numerically stable dual
-    method for solving strictly convex quadratic programs.
-    Mathematical Programming, 27, 1-33.
-
-Authors
--------
--  Robert T. McGibbon rmcgibbo@gmail.com
+----------
+1) D. Goldfarb and A. Idnani (1983). A numerically stable dual
+   method for solving strictly convex quadratic programs.
+   Mathematical Programming, 27, 1-33.
 """
 import setuptools
 from numpy.distutils.core import setup
@@ -23,7 +20,7 @@ from Cython.Build import cythonize
 from numpy.distutils.command import build_src
 
 ##########################
-VERSION = "0.1.0"
+VERSION = "0.1.2"
 __version__ = VERSION
 ##########################
 
@@ -64,7 +61,7 @@ setup(
     description=DOCLINES[0],
     version=__version__,
     long_description="\n".join(DOCLINES[2:]),
-    license='GPL',
+    license='GPLv2+',
     install_requires=['numpy'],
     zip_safe=False,
     ext_modules=cythonize(extensions),
