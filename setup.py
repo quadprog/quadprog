@@ -62,7 +62,6 @@ setup(
     version=__version__,
     long_description="\n".join(DOCLINES[2:]),
     license='GPLv2+',
-    install_requires=['numpy'],
     zip_safe=False,
     ext_modules=cythonize(extensions),
 )
