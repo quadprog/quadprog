@@ -1,4 +1,4 @@
-"""Strictly Convex Quadratic Programming Solver
+"""Quadratic Programming Solver
 
 Minimize     1/2 x^T G x - a^T x
 
