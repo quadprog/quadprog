@@ -20,7 +20,7 @@ from Cython.Build import cythonize
 from numpy.distutils.command import build_src
 
 ##########################
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 __version__ = VERSION
 ##########################
 
