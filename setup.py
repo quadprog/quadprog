@@ -22,6 +22,12 @@ import numpy as np
 from Cython.Build import cythonize
 from numpy.distutils.command import build_src
 
+##########################
+VERSION = "0.1.0"
+__version__ = VERSION
+##########################
+
+
 class build_src(build_src.build_src):
     def f2py_sources(self, sources, extension):
         return sources
@@ -36,6 +42,7 @@ License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)
 Programming Language :: Python
 Operating System :: OS Independent
 """
+
 
 extensions = [
     Extension('quadprog', ['quadprog/quadprog.pyx',
@@ -55,6 +62,7 @@ setup(
     cmdclass={'build_src': build_src},
     url="https://github.com/rmcgibbo/quadprog",
     description=DOCLINES[0],
+    version=__version__,
     long_description="\n".join(DOCLINES[2:]),
     license='GPL',
     install_requires=['numpy'],
