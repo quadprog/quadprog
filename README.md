@@ -23,5 +23,5 @@ References
 - Runtime
    - `numpy`
 - Build time
-   - `numpy`, `cython`, C++ compiler, fortran compiler
+   - `numpy`, `cython`, C++ compiler.
   
