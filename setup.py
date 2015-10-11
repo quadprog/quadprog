@@ -13,21 +13,14 @@ References
    Mathematical Programming, 27, 1-33.
 """
 import setuptools
-from numpy.distutils.core import setup
-from numpy.distutils.core import Extension
+from setuptools import setup, Extension
 import numpy as np
 from Cython.Build import cythonize
-from numpy.distutils.command import build_src
 
 ##########################
-VERSION = "0.1.4"
+VERSION = "0.1.5"
 __version__ = VERSION
 ##########################
-
-
-class build_src(build_src.build_src):
-    def f2py_sources(self, sources, extension):
-        return sources
 
 
 DOCLINES = __doc__.split("\n")
@@ -43,19 +36,17 @@ Operating System :: OS Independent
 
 extensions = [
     Extension('quadprog', ['quadprog/quadprog.pyx',
-                           'quadprog/aind.f', 'quadprog/solve.QP.f',
-                           'quadprog/util.f', 'quadprog/dpofa.f',
-                           'quadprog/daxpy.f', 'quadprog/ddot.f',
-                           'quadprog/dscal.f',
-                           'quadprog/fortranwrapper.c'],
-              language='c++'),
+                           'quadprog/aind.c', 'quadprog/solve.QP.c',
+                           'quadprog/util.c', 'quadprog/dpofa.c',
+                           'quadprog/daxpy.c', 'quadprog/ddot.c',
+                           'quadprog/dscal.c', 'quadprog/f2c_lite.c'],
+             include_dirs=['quadprog'], language='c++')
 ]
 
 setup(
     name='quadprog',
     author="Robert T. McGibbon",
     author_email='rmcgibbo@gmail.com',
-    cmdclass={'build_src': build_src},
     url="https://github.com/rmcgibbo/quadprog",
     description=DOCLINES[0],
     version=__version__,

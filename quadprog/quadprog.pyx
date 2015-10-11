@@ -2,7 +2,7 @@ import numpy as np
 from libc.stdio cimport printf
 
 cdef extern:
-    void qpgen2(double* dmat, double* dvec,int* fddmat,int* n,
+    void qpgen2_(double* dmat, double* dvec,int* fddmat,int* n,
                 double* sol, double* lagr, double* crval,
                 double* amat, double* bvec, int* fdamat,
                 int* q, int* meq, int* iact, int* nact, int* iter,
@@ -94,9 +94,9 @@ def solve_qp(double[:, :] G, double[:] a, double[:, :] C=None, double[:] b=None,
     else:
         ierr = 0
 
-    qpgen2(&G_[0,0], &a_[0], &n1, &n1, &sol[0], &lagr[0],
-           &crval, &C_[0, 0], &b_[0], &n1, &m1, &meq, &iact[0],
-           &nact, &iters[0], &work[0], &ierr)
+    qpgen2_(&G_[0,0], &a_[0], &n1, &n1, &sol[0], &lagr[0],
+            &crval, &C_[0, 0], &b_[0], &n1, &m1, &meq, &iact[0],
+            &nact, &iters[0], &work[0], &ierr)
 
     if ierr == 1:
         raise ValueError('constraints are inconsistent, no solution')
