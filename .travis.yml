@@ -1,12 +1,5 @@
-language: c
+language: cpp
 sudo: false
-addons:
-  apt:
-    sources:
-      - ubuntu-toolchain-r-test
-    packages:
-      - gfortran
-      - g++
 
 env:
   matrix:
