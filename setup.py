@@ -12,9 +12,8 @@ References
    method for solving strictly convex quadratic programs.
    Mathematical Programming, 27, 1-33.
 """
-import setuptools
+
 from setuptools import setup, Extension
-import numpy as np
 from Cython.Build import cythonize
 
 ##########################
