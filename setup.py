@@ -12,7 +12,7 @@ References
    method for solving strictly convex quadratic programs.
    Mathematical Programming, 27, 1-33.
 """
-
+setup_requires = ['Cython==0.27.3']
 from setuptools import setup, Extension
 from Cython.Build import cythonize
 
