@@ -59,5 +59,5 @@ setup(
     long_description="\n".join(DOCLINES[2:]),
     license='GPLv2+',
     zip_safe=False,
-    ext_modules=cythonize(extensions),
+    #ext_modules=cythonize(extensions),
 )
