@@ -44,7 +44,7 @@ extensions = [
 
 setup(
     setup_requires = ['Cython',],
-    install_requires = ['Cython',]
+    install_requires = ['Cython',],
     name='quadprog',
     author="Robert T. McGibbon",
     author_email='rmcgibbo@gmail.com',
