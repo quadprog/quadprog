@@ -43,7 +43,7 @@ extensions = [
 ]
 
 setup(
-   setup_requires = ['Cython==0.27.3']
+    setup_requires = ['Cython==0.27.3'],
     name='quadprog',
     author="Robert T. McGibbon",
     author_email='rmcgibbo@gmail.com',
