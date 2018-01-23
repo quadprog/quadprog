@@ -14,9 +14,6 @@ References
 """
 
 from setuptools import setup, Extension
-try:
-   from Cython.Build import cythonize
-from setuptools import setup, Extension
    
 ##########################
 VERSION = "0.1.6"
