@@ -16,10 +16,7 @@ References
 from setuptools import setup, Extension
 try:
    from Cython.Build import cythonize
-except ImportError:
-   def cythonize(*args, **kwargs):
-       from Cython.Build import cythonize
-       return cythonize(*args, **kwargs)
+from setuptools import setup, Extension
    
 ##########################
 VERSION = "0.1.6"
@@ -48,7 +45,11 @@ extensions = [
 ]
 
 setup(
-    setup_requires = ['Cython',],
+   
+    setup_requires = [
+       # Setuptools 18.0 properly handles Cython extensions.
+       'setuptools>=18.0',
+       'Cython',],
     install_requires = ['Cython',],
     name='quadprog',
     author="Robert T. McGibbon",
@@ -59,5 +60,5 @@ setup(
     long_description="\n".join(DOCLINES[2:]),
     license='GPLv2+',
     zip_safe=False,
-    #ext_modules=cythonize(extensions),
+    ext_modules=extensions,
 )
