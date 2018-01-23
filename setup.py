@@ -14,8 +14,13 @@ References
 """
 
 from setuptools import setup, Extension
-from Cython.Build import cythonize
-
+try:
+   from Cython.Build import cythonize
+except ImportError:
+   def cythonize(*args, **kwargs):
+       from Cython.Build import cythonize
+       return cythonize(*args, **kwargs)
+   
 ##########################
 VERSION = "0.1.6"
 __version__ = VERSION
