@@ -3,6 +3,7 @@ import scipy.optimize
 import scipy.stats
 from quadprog import solve_qp
 
+
 def solve_qp_scipy(G, a, C, b, meq=0):
     # Minimize     1/2 x^T G x - a^T x
     # Subject to   C.T x >= b
@@ -17,8 +18,9 @@ def solve_qp_scipy(G, a, C, b, meq=0):
     else:
         constraints = []
 
-    result = scipy.optimize.minimize(f, x0=np.zeros(len(G)), method='COBYLA',
-        constraints=constraints, tol=1e-10)
+    result = scipy.optimize.minimize(
+        f, x0=np.zeros(len(G)), method='COBYLA', constraints=constraints,
+        tol=1e-10, options={'maxiter': 2000})
     return result
 
 
@@ -55,7 +57,7 @@ def test_2():
 
 def test_3():
     random = np.random.RandomState(0)
-    G = scipy.stats.wishart(scale=np.eye(3,3), seed=random).rvs()
+    G = scipy.stats.wishart(scale=np.eye(3, 3), seed=random).rvs()
     a = random.randn(3)
     C = random.randn(3, 2)
     b = random.randn(2)
