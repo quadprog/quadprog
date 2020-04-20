@@ -88,7 +88,7 @@ def solve_qp(double[:, :] G, double[:] a, double[:, :] C=None, double[:] b=None,
     cdef int nact = 0
     cdef int ierr
     cdef int[::1] iters = np.zeros(2, dtype=np.int32)
-    cdef double[::1] work = np.zeros(2*n1+min(n1, m1)*(min(n1, m1)+5)/2 + 2*m1 +1)
+    cdef double[::1] work = np.zeros(2*n1+min(n1, m1)*(min(n1, m1)+5)//2 + 2*m1 +1)
     if factorized:
         ierr = 1
     else:
