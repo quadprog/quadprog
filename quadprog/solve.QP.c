@@ -544,7 +544,7 @@ L100:
 		    d__3 = (d__1 = work[i__ - 1], abs(d__1)), d__4 = (d__2 = 
 			    work[i__], abs(d__2));
 		    gs = min(d__3,d__4);
-		    d__1 = gc * sqrt(gs * gs / (gc * gc) + 1);
+		    d__1 = gc * sqrt((gs / gc) * (gs / gc) + 1);
 		    temp = d_sign(&d__1, &work[i__ - 1]);
 		    gc = work[i__ - 1] / temp;
 		    gs = work[i__] / temp;
@@ -660,7 +660,7 @@ L797:
     d__3 = (d__1 = work[l1 - 1], abs(d__1)), d__4 = (d__2 = work[l1], abs(
 	    d__2));
     gs = min(d__3,d__4);
-    d__1 = gc * sqrt(gs * gs / (gc * gc) + 1);
+    d__1 = gc * sqrt((gs / gc) * (gs / gc) + 1);
     temp = d_sign(&d__1, &work[l1 - 1]);
     gc = work[l1 - 1] / temp;
     gs = work[l1] / temp;
