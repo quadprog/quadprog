@@ -63,3 +63,19 @@ def test_3():
     b = random.randn(2)
     verify(G, a, C, b)
     verify(G, a)
+
+
+def test_4():
+    n = 66
+    X = np.full((n, n), 1e-20)
+    X[np.diag_indices_from(X)] = 1.0
+    y = np.arange(n, dtype=float)
+
+    random = np.random.RandomState(1)
+    G = np.dot(X.T, X)
+    a = np.dot(X, y)
+    C = np.identity(n)
+    b = y + random.rand(n)
+    
+    verify(G, a, C, b)
+
