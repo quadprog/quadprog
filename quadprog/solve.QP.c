@@ -106,19 +106,19 @@
     double sqrt(doublereal), d_sign(doublereal *, doublereal *);
 
     /* Local variables */
-    static integer i__, j, l, r__, l1;
-    static doublereal t1, gc, gs, nu, tt;
-    static integer it1, nvl;
-    static doublereal sum;
-    static integer info;
-    static doublereal tmpa, tmpb, temp;
-    static integer iwrm, iwrv, iwsv, iwuv, iwzv;
-    static logical t1inf, t2min;
+    integer i__, j, l, r__, l1;
+    doublereal t1, gc, gs, nu, tt;
+    integer it1, nvl;
+    doublereal sum;
+    integer info;
+    doublereal tmpa, tmpb, temp;
+    integer iwrm, iwrv, iwsv, iwuv, iwzv;
+    logical t1inf, t2min;
     extern /* Subroutine */ int dpofa_(doublereal *, integer *, integer *, 
 	    integer *), dpori_(doublereal *, integer *, integer *), dposl_(
 	    doublereal *, integer *, integer *, doublereal *);
-    static integer iwnbv;
-    static doublereal vsmall;
+    integer iwnbv;
+    doublereal vsmall;
 
     /* Parameter adjustments */
     --dvec;
