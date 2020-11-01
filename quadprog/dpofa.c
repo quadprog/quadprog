@@ -26,9 +26,9 @@ static integer c__1 = 1;
     double sqrt(doublereal);
 
     /* Local variables */
-    static integer j, k;
-    static doublereal s, t;
-    static integer jm1;
+    integer j, k;
+    doublereal s, t;
+    integer jm1;
     extern doublereal ddot_(integer *, doublereal *, integer *, doublereal *, 
 	    integer *);
 

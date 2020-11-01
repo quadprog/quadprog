@@ -22,9 +22,9 @@ static integer c__1 = 1;
     integer a_dim1, a_offset, i__1, i__2;
 
     /* Local variables */
-    static integer j, k;
-    static doublereal t;
-    static integer kp1;
+    integer j, k;
+    doublereal t;
+    integer kp1;
     extern /* Subroutine */ int dscal_(integer *, doublereal *, doublereal *, 
 	    integer *), daxpy_(integer *, doublereal *, doublereal *, integer 
 	    *, doublereal *, integer *);
@@ -112,9 +112,9 @@ L90:
     integer a_dim1, a_offset, i__1, i__2;
 
     /* Local variables */
-    static integer k;
-    static doublereal t;
-    static integer kb;
+    integer k;
+    doublereal t;
+    integer kb;
     extern doublereal ddot_(integer *, doublereal *, integer *, doublereal *, 
 	    integer *);
     extern /* Subroutine */ int daxpy_(integer *, doublereal *, doublereal *, 

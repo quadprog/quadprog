@@ -1,7 +1,7 @@
 import numpy as np
 from libc.stdio cimport printf
 
-cdef extern:
+cdef extern nogil:
     void qpgen2_(double* dmat, double* dvec,int* fddmat,int* n,
                 double* sol, double* lagr, double* crval,
                 double* amat, double* bvec, int* fdamat,
@@ -67,6 +67,8 @@ def solve_qp(double[:, :] G, double[:] a, double[:, :] C=None, double[:] b=None,
         b = -np.ones(1)
         meq = 0
 
+    cdef int meq_ = meq
+
     n3, m1 = C.shape[0], C.shape[1]
     if n1 != n2:
         raise ValueError('G must be a square matrix. Receive shape=(%d,%d)' % (n1, n2))
@@ -94,9 +96,10 @@ def solve_qp(double[:, :] G, double[:] a, double[:, :] C=None, double[:] b=None,
     else:
         ierr = 0
 
-    qpgen2_(&G_[0,0], &a_[0], &n1, &n1, &sol[0], &lagr[0],
-            &crval, &C_[0, 0], &b_[0], &n1, &m1, &meq, &iact[0],
-            &nact, &iters[0], &work[0], &ierr)
+    with nogil:
+        qpgen2_(&G_[0,0], &a_[0], &n1, &n1, &sol[0], &lagr[0],
+                &crval, &C_[0, 0], &b_[0], &n1, &m1, &meq_, &iact[0],
+                &nact, &iters[0], &work[0], &ierr)
 
     if ierr == 1:
         raise ValueError('constraints are inconsistent, no solution')

@@ -43,7 +43,7 @@
     integer ind_dim1, ind_offset, i__1, i__2;
 
     /* Local variables */
-    static integer i__, j;
+    integer i__, j;
 
     /* Parameter adjustments */
     ind_dim1 = *m;
