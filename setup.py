@@ -16,7 +16,7 @@ References
 from setuptools import setup, Extension
    
 ##########################
-VERSION = "0.1.7"
+VERSION = "0.1.8"
 __version__ = VERSION
 ##########################
 
@@ -44,7 +44,6 @@ extensions = [
 setup(
    
     setup_requires = [
-       # Setuptools 18.0 properly handles Cython extensions.
        'setuptools>=18.0',
        'Cython',],
     install_requires = ['Cython',],
