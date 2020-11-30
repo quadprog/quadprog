@@ -1,8 +1,6 @@
 # quadprog: Quadratic Programming Solver (Python)
-## [LOOKING FOR NEW LEAD MAINTAINERS]
 
 [![Build Status](https://travis-ci.org/rmcgibbo/quadprog.svg?branch=master)](https://travis-ci.org/rmcgibbo/quadprog)
-[![Maintainers Wanted](https://img.shields.io/badge/maintainers-wanted-red.svg)](https://github.com/pickhardt/maintainers-wanted)
 
 ```
 Solve a strictly convex quadratic program
