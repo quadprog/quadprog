@@ -58,8 +58,10 @@ jobs:
           pip install -r requirements_test.txt
 
       - name: Download package
-        run: |
-          echo TODO download package
+        uses: actions/download-artifact@v2
+        with:
+          name: sdist
+          path: dist
 
       - name: Install package
         run: |
