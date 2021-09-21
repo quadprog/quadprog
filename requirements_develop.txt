@@ -1,0 +1,4 @@
+Cython
+build
+pytest
+scipy
