@@ -23,6 +23,9 @@ References
 ### Dependencies
 - Runtime
    - `numpy`
-- Build time
-   - `numpy`, `cython`, C++ compiler.
-  
+- Installation
+   - `numpy`, C compiler.
+
+### Developing
+
+See [docs/DEVELOP.md](docs/DEVELOP.md).
