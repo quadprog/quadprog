@@ -1,6 +1,6 @@
-"""Quadratic Programming Solver
+from setuptools import setup, Extension
 
-Minimize     1/2 x^T G x - a^T x
+long_description = """Minimize     1/2 x^T G x - a^T x
 
 Subject to   C.T x >= b
 
@@ -13,48 +13,42 @@ References
    Mathematical Programming, 27, 1-33.
 """
 
-from setuptools import setup, Extension
-   
-##########################
-VERSION = "0.1.8"
-__version__ = VERSION
-##########################
-
-
-DOCLINES = __doc__.split("\n")
-CLASSIFIERS = """\
-Development Status :: 3 - Alpha
-Intended Audience :: Science/Research
-Intended Audience :: Developers
-License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)
-Programming Language :: Python
-Operating System :: OS Independent
-"""
-
-
-extensions = [
-    Extension('quadprog', ['quadprog/quadprog.pyx',
-                           'quadprog/aind.c', 'quadprog/solve.QP.c',
-                           'quadprog/util.c', 'quadprog/dpofa.c',
-                           'quadprog/daxpy.c', 'quadprog/ddot.c',
-                           'quadprog/dscal.c', 'quadprog/f2c_lite.c'],
-             include_dirs=['quadprog'], language='c++')
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Education",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Topic :: Scientific/Engineering :: Mathematics"
 ]
 
+extensions = [Extension('quadprog', [
+    'quadprog/aind.c',
+    'quadprog/daxpy.c',
+    'quadprog/ddot.c',
+    'quadprog/dpofa.c',
+    'quadprog/dscal.c',
+    'quadprog/f2c_lite.c',
+    'quadprog/quadprog.c',
+    'quadprog/solve.QP.c',
+    'quadprog/util.c',
+])]
+
 setup(
-   
-    setup_requires = [
-       'setuptools>=18.0',
-       'Cython',],
-    install_requires = ['Cython',],
-    name='quadprog',
+    name="quadprog",
+    version="0.1.8",
+    description="Quadratic Programming Solver",
+    long_description=long_description,
+    url="https://github.com/quadprog/quadprog",
     author="Robert T. McGibbon",
     author_email='rmcgibbo@gmail.com',
-    url="https://github.com/rmcgibbo/quadprog",
-    description=DOCLINES[0],
-    version=__version__,
-    long_description="\n".join(DOCLINES[2:]),
     license='GPLv2+',
-    zip_safe=False,
+    classifiers=classifiers,
     ext_modules=extensions,
+    install_requires=["numpy"]
 )

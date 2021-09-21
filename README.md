@@ -1,6 +1,6 @@
 # quadprog: Quadratic Programming Solver (Python)
 
-[![.github/workflows/run-tests.yaml](https://github.com/quadprog/quadprog/actions/workflows/run-tests.yaml/badge.svg?branch=master)](https://github.com/quadprog/quadprog/actions/workflows/run-tests.yaml)
+[![.github/workflows/build-and-test.yaml](https://github.com/quadprog/quadprog/actions/workflows/build-and-test.yaml/badge.svg?branch=master)](https://github.com/quadprog/quadprog/actions/workflows/build-and-test.yaml)
 
 ```
 Solve a strictly convex quadratic program
@@ -23,6 +23,9 @@ References
 ### Dependencies
 - Runtime
    - `numpy`
-- Build time
-   - `numpy`, `cython`, C++ compiler.
-  
+- Installation
+   - `numpy`, C compiler.
+
+### Developing
+
+See [docs/DEVELOP.md](docs/DEVELOP.md).
