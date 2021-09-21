@@ -1,6 +1,6 @@
 # quadprog: Quadratic Programming Solver (Python)
 
-[![Build Status](https://travis-ci.org/rmcgibbo/quadprog.svg?branch=master)](https://travis-ci.org/rmcgibbo/quadprog)
+[![.github/workflows/run-tests.yaml](https://github.com/quadprog/quadprog/actions/workflows/run-tests.yaml/badge.svg?branch=master)](https://github.com/quadprog/quadprog/actions/workflows/run-tests.yaml)
 
 ```
 Solve a strictly convex quadratic program
