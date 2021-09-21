@@ -1,4 +1,2 @@
 Cython
 build
-pytest
-scipy
