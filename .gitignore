@@ -3,4 +3,4 @@ build
 quadprog.so
 quadprog.egg-info/
 dist/
-quadprog/tests/__pycache__/
+tests/__pycache__/
