@@ -1,4 +1,4 @@
-quadprog/quadprog.cpp
+quadprog/quadprog.c
 build
 quadprog.so
 quadprog.egg-info/
