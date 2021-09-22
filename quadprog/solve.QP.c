@@ -1,18 +1,3 @@
-/* solve.QP.f -- translated by f2c (version 20100827).
-   You must link the resulting object file with libf2c:
-	on Microsoft Windows system, link with libf2c.lib;
-	on Linux or Unix systems, link with .../path/to/libf2c.a -lm
-	or, if you install libf2c.a in a standard place, with -lf2c -lm
-	-- in that order, at the end of the command line, as in
-		cc *.o -lf2c -lm
-	Source for libf2c is in /netlib/f2c/libf2c.zip, e.g.,
-
-		http://www.netlib.org/f2c/libf2c.zip
-*/
-
-#include "f2c.h"
-
-
 /*  Copyright (C) 1995-2010 Berwin A. Turlach <Berwin.Turlach@gmail.com> */
 
 /*  This program is free software; you can redistribute it and/or modify */
@@ -92,33 +77,42 @@
 /*  work  vector with length at least 2*n+r*(r+5)/2 + 2*q +1 */
 /*        where r=min(n,q) */
 
-/* Subroutine */ int qpgen2_(doublereal *dmat, doublereal *dvec, integer *
-	fddmat, integer *n, doublereal *sol, doublereal *lagr, doublereal *
-	crval, doublereal *amat, doublereal *bvec, integer *fdamat, integer *
-	q, integer *meq, integer *iact, integer *nact, integer *iter, 
-	doublereal *work, integer *ierr)
+#define abs(x) ((x) >= 0 ? (x) : -(x))
+#define min(a,b) ((a) <= (b) ? (a) : (b))
+#define max(a,b) ((a) >= (b) ? (a) : (b))
+
+double d_sign(double *a, double *b) {
+	double x = (*a >= 0 ? *a : -*a);
+	return *b >= 0 ? x : -x;
+}
+
+/* Subroutine */ int qpgen2_(double *dmat, double *dvec, int *
+	fddmat, int *n, double *sol, double *lagr, double *
+	crval, double *amat, double *bvec, int *fdamat, int *
+	q, int *meq, int *iact, int *nact, int *iter,
+	double *work, int *ierr)
 {
     /* System generated locals */
-    integer dmat_dim1, dmat_offset, amat_dim1, amat_offset, i__1, i__2;
-    doublereal d__1, d__2, d__3, d__4;
+    int dmat_dim1, dmat_offset, amat_dim1, amat_offset, i__1, i__2;
+    double d__1, d__2, d__3, d__4;
 
     /* Builtin functions */
-    double sqrt(doublereal), d_sign(doublereal *, doublereal *);
+    double sqrt(double);
 
     /* Local variables */
-    integer i__, j, l, r__, l1;
-    doublereal t1, gc, gs, nu, tt;
-    integer it1, nvl;
-    doublereal sum;
-    integer info;
-    doublereal tmpa, tmpb, temp;
-    integer iwrm, iwrv, iwsv, iwuv, iwzv;
-    logical t1inf, t2min;
-    extern /* Subroutine */ int dpofa_(doublereal *, integer *, integer *, 
-	    integer *), dpori_(doublereal *, integer *, integer *), dposl_(
-	    doublereal *, integer *, integer *, doublereal *);
-    integer iwnbv;
-    doublereal vsmall;
+    int i__, j, l, r__, l1;
+    double t1, gc, gs, nu, tt;
+    int it1, nvl;
+    double sum;
+    int info;
+    double tmpa, tmpb, temp;
+    int iwrm, iwrv, iwsv, iwuv, iwzv;
+    int t1inf, t2min;
+    extern /* Subroutine */ int dpofa_(double *, int *, int *,
+	    int *), dpori_(double *, int *, int *), dposl_(
+	    double *, int *, int *, double *);
+    int iwnbv;
+    double vsmall;
 
     /* Parameter adjustments */
     --dvec;
@@ -374,7 +368,7 @@ L55:
 /* and r = R^{-1} d_1, check also if r has positive elements (among the */
 /* entries corresponding to inequalities constraints). */
 
-    t1inf = TRUE_;
+    t1inf = 1;
     for (i__ = *nact; i__ >= 1; --i__) {
 	sum = work[i__];
 	l = iwrm + i__ * (i__ + 3) / 2;
@@ -394,7 +388,7 @@ L55:
 	    goto L95;
 	}
 /* L7: */
-	t1inf = FALSE_;
+	t1inf = 0;
 	it1 = i__;
 L95:
 	;
@@ -470,11 +464,11 @@ L100:
 /* L120: */
 	}
 	tt = -work[iwsv + nvl] / sum;
-	t2min = TRUE_;
+	t2min = 1;
 	if (! t1inf) {
 	    if (t1 < tt) {
 		tt = t1;
-		t2min = FALSE_;
+		t2min = 0;
 	    }
 	}
 

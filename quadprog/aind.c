@@ -1,18 +1,3 @@
-/* aind.f -- translated by f2c (version 20100827).
-   You must link the resulting object file with libf2c:
-	on Microsoft Windows system, link with libf2c.lib;
-	on Linux or Unix systems, link with .../path/to/libf2c.a -lm
-	or, if you install libf2c.a in a standard place, with -lf2c -lm
-	-- in that order, at the end of the command line, as in
-		cc *.o -lf2c -lm
-	Source for libf2c is in /netlib/f2c/libf2c.zip, e.g.,
-
-		http://www.netlib.org/f2c/libf2c.zip
-*/
-
-#include "f2c.h"
-
-
 /*  Copyright (C) 1997-2010 Berwin A. Turlach <Berwin.Turlach@gmail.com> */
 
 /*  This program is free software; you can redistribute it and/or modify */
@@ -36,14 +21,14 @@
 
 /*  Aind is a m times q matrix constructed in Splus */
 
-/* Subroutine */ int aind_(integer *ind, integer *m, integer *q, integer *n, 
-	integer *ok)
+/* Subroutine */ int aind_(int *ind, int *m, int *q, int *n,
+	int *ok)
 {
     /* System generated locals */
-    integer ind_dim1, ind_offset, i__1, i__2;
+    int ind_dim1, ind_offset, i__1, i__2;
 
     /* Local variables */
-    integer i__, j;
+    int i__, j;
 
     /* Parameter adjustments */
     ind_dim1 = *m;
