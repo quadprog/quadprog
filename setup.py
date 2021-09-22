@@ -33,7 +33,6 @@ extensions = [Extension('quadprog', [
     'quadprog/ddot.c',
     'quadprog/dpofa.c',
     'quadprog/dscal.c',
-    'quadprog/f2c_lite.c',
     'quadprog/quadprog.c',
     'quadprog/solve.QP.c',
     'quadprog/util.c',
