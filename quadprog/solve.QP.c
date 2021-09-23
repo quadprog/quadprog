@@ -86,6 +86,19 @@ double d_sign(double *a, double *b) {
 	return *b >= 0 ? x : -x;
 }
 
+/*
+ * code gleaned from Powell's ZQPCVX routine to determine a small
+ * number that can be assumed to be an upper bound on the relative
+ * precision of the computer arithmetic.
+ */
+double calculate_vsmall() {
+    double vsmall = 1e-60;
+    do {
+        vsmall += vsmall;
+    } while ((vsmall * .1 + 1.) <= 1.0 || (vsmall * .2 + 1.) <= 1.0);
+    return vsmall;
+}
+
 /* Subroutine */ int qpgen2_(double *dmat, double *dvec, int *
 	fddmat, int *n, double *sol, double *lagr, double *
 	crval, double *amat, double *bvec, int *fdamat, int *
@@ -109,7 +122,7 @@ double d_sign(double *a, double *b) {
     int iwrm, iwrv, iwsv, iwuv, iwzv;
     int t1inf, t2min;
     int iwnbv;
-    double vsmall;
+    double vsmall = calculate_vsmall();
 
     dmat_dim1 = *fddmat;
     amat_dim1 = *fdamat;
@@ -134,22 +147,6 @@ double d_sign(double *a, double *b) {
     double *rm = &work[iwrm];
     double *sv = &work[iwsv];
     double *nbv = &work[iwnbv];
-
-/*     code gleaned from Powell's ZQPCVX routine to determine a small */
-/*     number  that can be assumed to be an upper bound on the relative */
-/*     precision of the computer arithmetic. */
-
-    vsmall = 1e-60;
-L1:
-    vsmall += vsmall;
-    tmpa = vsmall * .1 + 1.;
-    tmpb = vsmall * .2 + 1.;
-    if (tmpa <= 1.) {
-	goto L1;
-    }
-    if (tmpb <= 1.) {
-	goto L1;
-    }
 
 /* store the initial dvec to calculate below the unconstrained minima of */
 /* the critical value. */
