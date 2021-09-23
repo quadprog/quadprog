@@ -93,7 +93,7 @@ double d_sign(double *a, double *b) {
 	double *work, int *ierr)
 {
     /* System generated locals */
-    int dmat_dim1, dmat_offset, amat_dim1, amat_offset, i__1, i__2;
+    int dmat_dim1, amat_dim1, i__1, i__2;
     double d__1, d__2, d__3, d__4;
 
     /* Builtin functions */
@@ -111,20 +111,11 @@ double d_sign(double *a, double *b) {
     int iwnbv;
     double vsmall;
 
-    /* Parameter adjustments */
-    --dvec;
     dmat_dim1 = *fddmat;
-    dmat_offset = 1 + dmat_dim1;
-    dmat -= dmat_offset;
-    --sol;
-    --lagr;
-    --bvec;
     amat_dim1 = *fdamat;
-    amat_offset = 1 + amat_dim1;
-    amat -= amat_offset;
-    --iact;
-    --iter;
-    --work;
+
+    int* pIterMain = &iter[0];
+	int* pIterDeleted = &iter[1];
 
     /* Function Body */
     r__ = min(*n,*q);
@@ -151,32 +142,32 @@ L1:
 
     i__1 = *n;
     for (i__ = 1; i__ <= i__1; ++i__) {
-	work[i__] = dvec[i__];
+	work[i__-1] = dvec[i__ - 1];
 /* L10: */
     }
     i__1 = l;
     for (i__ = *n + 1; i__ <= i__1; ++i__) {
-	work[i__] = 0.;
+	work[i__-1] = 0.;
 /* L11: */
     }
     i__1 = *q;
     for (i__ = 1; i__ <= i__1; ++i__) {
-	iact[i__] = 0;
-	lagr[i__] = 0.;
+	iact[i__-1] = 0;
+	lagr[i__-1] = 0.;
 /* L12: */
     }
 
 /* get the initial solution */
 
     if (*ierr == 0) {
-	info = cholesky(*n, &dmat[dmat_offset]);
+	info = cholesky(*n, dmat);
 	if (info != 0) {
 	    *ierr = 2;
 	    goto L999;
 	}
-	triangular_solve_transpose(*n, &dmat[dmat_offset], &dvec[1]);
-	triangular_solve(*n, &dmat[dmat_offset], &dvec[1]);
-	triangular_invert(*n, &dmat[dmat_offset]);
+	triangular_solve_transpose(*n, dmat, dvec);
+	triangular_solve(*n, dmat, dvec);
+	triangular_invert(*n, dmat);
     } else {
 
 /* Matrix D is already factorized, so we have to multiply d first with */
@@ -185,20 +176,20 @@ L1:
 
 	i__1 = *n;
 	for (j = 1; j <= i__1; ++j) {
-	    sol[j] = 0.;
+	    sol[j-1] = 0.;
 	    i__2 = j;
 	    for (i__ = 1; i__ <= i__2; ++i__) {
-		sol[j] += dmat[i__ + j * dmat_dim1] * dvec[i__];
+		sol[j-1] += dmat[i__-1 + (j-1) * dmat_dim1] * dvec[i__ - 1];
 /* L21: */
 	    }
 /* L20: */
 	}
 	i__1 = *n;
 	for (j = 1; j <= i__1; ++j) {
-	    dvec[j] = 0.;
+	    dvec[j-1] = 0.;
 	    i__2 = *n;
 	    for (i__ = j; i__ <= i__2; ++i__) {
-		dvec[j] += dmat[j + i__ * dmat_dim1] * sol[i__];
+		dvec[j-1] += dmat[j-1 + (i__-1) * dmat_dim1] * sol[i__-1];
 /* L23: */
 	    }
 /* L22: */
@@ -211,12 +202,12 @@ L1:
     *crval = 0.;
     i__1 = *n;
     for (j = 1; j <= i__1; ++j) {
-	sol[j] = dvec[j];
-	*crval += work[j] * sol[j];
-	work[j] = 0.;
+	sol[j-1] = dvec[j-1];
+	*crval += work[j-1] * sol[j-1];
+	work[j-1] = 0.;
 	i__2 = *n;
 	for (i__ = j + 1; i__ <= i__2; ++i__) {
-	    dmat[i__ + j * dmat_dim1] = 0.;
+	    dmat[(i__-1) + (j-1) * dmat_dim1] = 0.;
 /* L32: */
 	}
 /* L30: */
@@ -241,20 +232,20 @@ L1:
 	sum = 0.;
 	i__2 = *n;
 	for (j = 1; j <= i__2; ++j) {
-	    sum += amat[j + i__ * amat_dim1] * amat[j + i__ * amat_dim1];
+	    sum += amat[j-1 + (i__-1) * amat_dim1] * amat[j-1 + (i__-1) * amat_dim1];
 /* L52: */
 	}
-	work[iwnbv + i__] = sqrt(sum);
+	work[iwnbv + i__-1] = sqrt(sum);
 /* L51: */
     }
     *nact = 0;
-    iter[1] = 0;
-    iter[2] = 0;
+    *pIterMain = 0;
+    *pIterDeleted = 0;
 L50:
 
 /* start a new iteration */
 
-    ++iter[1];
+    ++*pIterMain;
 
 /* calculate all constraints and check which are still violated */
 /* for the equality constraints we have to check whether the normal */
@@ -264,26 +255,26 @@ L50:
     i__1 = *q;
     for (i__ = 1; i__ <= i__1; ++i__) {
 	++l;
-	sum = -bvec[i__];
+	sum = -bvec[i__-1];
 	i__2 = *n;
 	for (j = 1; j <= i__2; ++j) {
-	    sum += amat[j + i__ * amat_dim1] * sol[j];
+	    sum += amat[j-1 + (i__-1) * amat_dim1] * sol[j-1];
 /* L61: */
 	}
 	if (abs(sum) < vsmall) {
 	    sum = 0.;
 	}
 	if (i__ > *meq) {
-	    work[l] = sum;
+	    work[l-1] = sum;
 	} else {
-	    work[l] = -abs(sum);
+	    work[l-1] = -abs(sum);
 	    if (sum > 0.) {
 		i__2 = *n;
 		for (j = 1; j <= i__2; ++j) {
-		    amat[j + i__ * amat_dim1] = -amat[j + i__ * amat_dim1];
+		    amat[j-1 + (i__-1) * amat_dim1] = -amat[j-1 + (i__-1) * amat_dim1];
 /* L62: */
 		}
-		bvec[i__] = -bvec[i__];
+		bvec[i__-1] = -bvec[i__-1];
 	    }
 	}
 /* L60: */
@@ -294,7 +285,7 @@ L50:
 
     i__1 = *nact;
     for (i__ = 1; i__ <= i__1; ++i__) {
-	work[iwsv + iact[i__]] = 0.;
+	work[iwsv + iact[i__-1]-1] = 0.;
 /* L70: */
     }
 
@@ -308,9 +299,9 @@ L50:
     temp = 0.;
     i__1 = *q;
     for (i__ = 1; i__ <= i__1; ++i__) {
-	if (work[iwsv + i__] < temp * work[iwnbv + i__]) {
+	if (work[iwsv + i__-1] < temp * work[iwnbv + i__-1]) {
 	    nvl = i__;
-	    temp = work[iwsv + i__] / work[iwnbv + i__];
+	    temp = work[iwsv + i__-1] / work[iwnbv + i__-1];
 	}
 /*         if (work(iwsv+i) .LT. 0.d0) then */
 /*            nvl = i */
@@ -322,7 +313,7 @@ L50:
     if (nvl == 0) {
 	i__1 = *nact;
 	for (i__ = 1; i__ <= i__1; ++i__) {
-	    lagr[iact[i__]] = work[iwuv + i__];
+	    lagr[iact[i__-1]-1] = work[iwuv + i__-1];
 /* L73: */
 	}
 	goto L999;
@@ -338,10 +329,10 @@ L55:
 	sum = 0.;
 	i__2 = *n;
 	for (j = 1; j <= i__2; ++j) {
-	    sum += dmat[j + i__ * dmat_dim1] * amat[j + nvl * amat_dim1];
+	    sum += dmat[(j-1) + (i__-1) * dmat_dim1] * amat[j-1 + (nvl-1) * amat_dim1];
 /* L81: */
 	}
-	work[i__] = sum;
+	work[i__-1] = sum;
 /* L80: */
     }
 
@@ -350,14 +341,14 @@ L55:
     l1 = iwzv;
     i__1 = *n;
     for (i__ = 1; i__ <= i__1; ++i__) {
-	work[l1 + i__] = 0.;
+	work[l1 + i__-1] = 0.;
 /* L90: */
     }
     i__1 = *n;
     for (j = *nact + 1; j <= i__1; ++j) {
 	i__2 = *n;
 	for (i__ = 1; i__ <= i__2; ++i__) {
-	    work[l1 + i__] += dmat[i__ + j * dmat_dim1] * work[j];
+	    work[l1 + i__-1] += dmat[i__-1 + (j-1) * dmat_dim1] * work[j-1];
 /* L93: */
 	}
 /* L92: */
@@ -368,18 +359,18 @@ L55:
 
     t1inf = 1;
     for (i__ = *nact; i__ >= 1; --i__) {
-	sum = work[i__];
+	sum = work[i__-1];
 	l = iwrm + i__ * (i__ + 3) / 2;
 	l1 = l - i__;
 	i__1 = *nact;
 	for (j = i__ + 1; j <= i__1; ++j) {
-	    sum -= work[l] * work[iwrv + j];
+	    sum -= work[l-1] * work[iwrv + j-1];
 	    l += j;
 /* L96: */
 	}
-	sum /= work[l1];
-	work[iwrv + i__] = sum;
-	if (iact[i__] <= *meq) {
+	sum /= work[l1-1];
+	work[iwrv + i__-1] = sum;
+	if (iact[i__-1] <= *meq) {
 	    goto L95;
 	}
 	if (sum <= 0.) {
@@ -397,16 +388,16 @@ L95:
 /* it1  stores in which component t1, the min of u/r, occurs. */
 
     if (! t1inf) {
-	t1 = work[iwuv + it1] / work[iwrv + it1];
+	t1 = work[iwuv + it1-1] / work[iwrv + it1-1];
 	i__1 = *nact;
 	for (i__ = 1; i__ <= i__1; ++i__) {
-	    if (iact[i__] <= *meq) {
+	    if (iact[i__-1] <= *meq) {
 		goto L100;
 	    }
-	    if (work[iwrv + i__] <= 0.) {
+	    if (work[iwrv + i__-1] <= 0.) {
 		goto L100;
 	    }
-	    temp = work[iwuv + i__] / work[iwrv + i__];
+	    temp = work[iwuv + i__-1] / work[iwrv + i__-1];
 	    if (temp < t1) {
 		t1 = temp;
 		it1 = i__;
@@ -421,7 +412,7 @@ L100:
     sum = 0.;
     i__1 = iwzv + *n;
     for (i__ = iwzv + 1; i__ <= i__1; ++i__) {
-	sum += work[i__] * work[i__];
+	sum += work[i__-1] * work[i__-1];
 /* L110: */
     }
     if (abs(sum) <= vsmall) {
@@ -443,10 +434,10 @@ L100:
 
 	    i__1 = *nact;
 	    for (i__ = 1; i__ <= i__1; ++i__) {
-		work[iwuv + i__] -= t1 * work[iwrv + i__];
+		work[iwuv + i__-1] -= t1 * work[iwrv + i__-1];
 /* L111: */
 	    }
-	    work[iwuv + *nact + 1] += t1;
+	    work[iwuv + *nact] += t1;
 	    goto L700;
 	}
     } else {
@@ -458,10 +449,10 @@ L100:
 	sum = 0.;
 	i__1 = *n;
 	for (i__ = 1; i__ <= i__1; ++i__) {
-	    sum += work[iwzv + i__] * amat[i__ + nvl * amat_dim1];
+	    sum += work[iwzv + i__-1] * amat[(i__-1) + (nvl-1) * amat_dim1];
 /* L120: */
 	}
-	tt = -work[iwsv + nvl] / sum;
+	tt = -work[iwsv + nvl-1] / sum;
 	t2min = 1;
 	if (! t1inf) {
 	    if (t1 < tt) {
@@ -474,16 +465,16 @@ L100:
 
 	i__1 = *n;
 	for (i__ = 1; i__ <= i__1; ++i__) {
-	    sol[i__] += tt * work[iwzv + i__];
+	    sol[i__-1] += tt * work[iwzv + i__-1];
 /* L130: */
 	}
-	*crval += tt * sum * (tt / 2. + work[iwuv + *nact + 1]);
+	*crval += tt * sum * (tt / 2. + work[iwuv + *nact]);
 	i__1 = *nact;
 	for (i__ = 1; i__ <= i__1; ++i__) {
-	    work[iwuv + i__] -= tt * work[iwrv + i__];
+	    work[iwuv + i__-1] -= tt * work[iwrv + i__-1];
 /* L131: */
 	}
-	work[iwuv + *nact + 1] += tt;
+	work[iwuv + *nact] += tt;
 
 /* if it was a full step, then we check wheter further constraints are */
 /* violated otherwise we can drop the current constraint and iterate once */
@@ -494,7 +485,7 @@ L100:
 /* constraints and update J and R */
 
 	    ++(*nact);
-	    iact[*nact] = nvl;
+	    iact[*nact-1] = nvl;
 
 /* to update R we have to put the first nact-1 components of the d vector */
 /* into column (nact) of R */
@@ -502,7 +493,7 @@ L100:
 	    l = iwrm + (*nact - 1) * *nact / 2 + 1;
 	    i__1 = *nact - 1;
 	    for (i__ = 1; i__ <= i__1; ++i__) {
-		work[l] = work[i__];
+		work[l-1] = work[i__-1];
 		++l;
 /* L150: */
 	    }
@@ -515,7 +506,7 @@ L100:
 /* Givens transformations. */
 
 	    if (*nact == *n) {
-		work[l] = work[*n];
+		work[l-1] = work[*n-1];
 	    } else {
 		i__1 = *nact + 1;
 		for (i__ = *n; i__ >= i__1; --i__) {
@@ -525,21 +516,21 @@ L100:
 /* if it is already zero we don't have to do anything, except of */
 /* decreasing l1 */
 
-		    if (work[i__] == 0.) {
+		    if (work[i__-1] == 0.) {
 			goto L160;
 		    }
 /* Computing MAX */
-		    d__3 = (d__1 = work[i__ - 1], abs(d__1)), d__4 = (d__2 = 
-			    work[i__], abs(d__2));
+		    d__3 = (d__1 = work[i__-1 - 1], abs(d__1)), d__4 = (d__2 = 
+			    work[i__-1], abs(d__2));
 		    gc = max(d__3,d__4);
 /* Computing MIN */
-		    d__3 = (d__1 = work[i__ - 1], abs(d__1)), d__4 = (d__2 = 
-			    work[i__], abs(d__2));
+		    d__3 = (d__1 = work[i__-1 - 1], abs(d__1)), d__4 = (d__2 = 
+			    work[i__-1], abs(d__2));
 		    gs = min(d__3,d__4);
 		    d__1 = gc * sqrt((gs / gc) * (gs / gc) + 1);
-		    temp = d_sign(&d__1, &work[i__ - 1]);
-		    gc = work[i__ - 1] / temp;
-		    gs = work[i__] / temp;
+		    temp = d_sign(&d__1, &work[i__-1 - 1]);
+		    gc = work[i__-1 - 1] / temp;
+		    gs = work[i__-1] / temp;
 
 /* The Givens rotation is done with the matrix (gc gs, gs -gc). */
 /* If gc is one, then element (i) of d is zero compared with element */
@@ -554,26 +545,26 @@ L100:
 			goto L160;
 		    }
 		    if (gc == 0.) {
-			work[i__ - 1] = gs * temp;
+			work[i__-1 - 1] = gs * temp;
 			i__2 = *n;
 			for (j = 1; j <= i__2; ++j) {
-			    temp = dmat[j + (i__ - 1) * dmat_dim1];
-			    dmat[j + (i__ - 1) * dmat_dim1] = dmat[j + i__ * 
+			    temp = dmat[(j-1) + (i__-1 - 1) * dmat_dim1];
+			    dmat[j-1 + (i__-1 - 1) * dmat_dim1] = dmat[j-1 + (i__-1) * 
 				    dmat_dim1];
-			    dmat[j + i__ * dmat_dim1] = temp;
+			    dmat[j-1 + (i__-1) * dmat_dim1] = temp;
 /* L170: */
 			}
 		    } else {
-			work[i__ - 1] = temp;
+			work[i__-1 - 1] = temp;
 			nu = gs / (gc + 1.);
 			i__2 = *n;
 			for (j = 1; j <= i__2; ++j) {
-			    temp = gc * dmat[j + (i__ - 1) * dmat_dim1] + gs *
-				     dmat[j + i__ * dmat_dim1];
-			    dmat[j + i__ * dmat_dim1] = nu * (dmat[j + (i__ - 
-				    1) * dmat_dim1] + temp) - dmat[j + i__ * 
+			    temp = gc * dmat[j-1 + (i__-1 - 1) * dmat_dim1] + gs *
+				     dmat[j-1 + (i__-1) * dmat_dim1];
+			    dmat[j-1 + (i__-1) * dmat_dim1] = nu * (dmat[j-1 + (i__-1 - 
+				    1) * dmat_dim1] + temp) - dmat[j-1 + (i__-1) * 
 				    dmat_dim1];
-			    dmat[j + (i__ - 1) * dmat_dim1] = temp;
+			    dmat[j-1 + (i__-1 - 1) * dmat_dim1] = temp;
 /* L180: */
 			}
 		    }
@@ -583,7 +574,7 @@ L160:
 
 /* l is still pointing to element (nact,nact) of the matrix R. */
 /* So store d(nact) in R(nact,nact) */
-		work[l] = work[*nact];
+		work[l-1] = work[*nact-1];
 	    }
 	} else {
 
@@ -593,24 +584,24 @@ L160:
 /* but since the fit changed, we have to recalculate now "how much" */
 /* the fit violates the chosen constraint now. */
 
-	    sum = -bvec[nvl];
+	    sum = -bvec[nvl-1];
 	    i__1 = *n;
 	    for (j = 1; j <= i__1; ++j) {
-		sum += sol[j] * amat[j + nvl * amat_dim1];
+		sum += sol[j-1] * amat[j-1 + (nvl-1) * amat_dim1];
 /* L190: */
 	    }
 	    if (nvl > *meq) {
-		work[iwsv + nvl] = sum;
+		work[iwsv + nvl-1] = sum;
 	    } else {
-		work[iwsv + nvl] = -abs(sum);
+		work[iwsv + nvl-1] = -abs(sum);
 		if (sum > 0.) {
 		    i__1 = *n;
 		    for (j = 1; j <= i__1; ++j) {
-			amat[j + nvl * amat_dim1] = -amat[j + nvl * amat_dim1]
+			amat[j-1 + (nvl-1) * amat_dim1] = -amat[j-1 + (nvl-1) * amat_dim1]
 				;
 /* L191: */
 		    }
-		    bvec[nvl] = -bvec[nvl];
+		    bvec[nvl-1] = -bvec[nvl-1];
 		}
 	    }
 	    goto L700;
@@ -641,21 +632,21 @@ L797:
 
     l = iwrm + it1 * (it1 + 1) / 2 + 1;
     l1 = l + it1;
-    if (work[l1] == 0.) {
+    if (work[l1-1] == 0.) {
 	goto L798;
     }
 /* Computing MAX */
-    d__3 = (d__1 = work[l1 - 1], abs(d__1)), d__4 = (d__2 = work[l1], abs(
+    d__3 = (d__1 = work[l1-1 - 1], abs(d__1)), d__4 = (d__2 = work[l1-1], abs(
 	    d__2));
     gc = max(d__3,d__4);
 /* Computing MIN */
-    d__3 = (d__1 = work[l1 - 1], abs(d__1)), d__4 = (d__2 = work[l1], abs(
+    d__3 = (d__1 = work[l1-1 - 1], abs(d__1)), d__4 = (d__2 = work[l1-1], abs(
 	    d__2));
     gs = min(d__3,d__4);
     d__1 = gc * sqrt((gs / gc) * (gs / gc) + 1);
-    temp = d_sign(&d__1, &work[l1 - 1]);
-    gc = work[l1 - 1] / temp;
-    gs = work[l1] / temp;
+    temp = d_sign(&d__1, &work[l1-1 - 1]);
+    gc = work[l1-1 - 1] / temp;
+    gs = work[l1-1] / temp;
 
 /* The Givens rotatin is done with the matrix (gc gs, gs -gc). */
 /* If gc is one, then element (it1+1,it1+1) of R is zero compared with */
@@ -671,36 +662,36 @@ L797:
     if (gc == 0.) {
 	i__1 = *nact;
 	for (i__ = it1 + 1; i__ <= i__1; ++i__) {
-	    temp = work[l1 - 1];
-	    work[l1 - 1] = work[l1];
-	    work[l1] = temp;
+	    temp = work[l1-1 - 1];
+	    work[l1-1 - 1] = work[l1-1];
+	    work[l1-1] = temp;
 	    l1 += i__;
 /* L710: */
 	}
 	i__1 = *n;
 	for (i__ = 1; i__ <= i__1; ++i__) {
-	    temp = dmat[i__ + it1 * dmat_dim1];
-	    dmat[i__ + it1 * dmat_dim1] = dmat[i__ + (it1 + 1) * dmat_dim1];
-	    dmat[i__ + (it1 + 1) * dmat_dim1] = temp;
+	    temp = dmat[i__-1 + (it1-1) * dmat_dim1];
+	    dmat[i__-1 + (it1-1) * dmat_dim1] = dmat[i__-1 + (it1) * dmat_dim1];
+	    dmat[i__-1 + (it1) * dmat_dim1] = temp;
 /* L711: */
 	}
     } else {
 	nu = gs / (gc + 1.);
 	i__1 = *nact;
 	for (i__ = it1 + 1; i__ <= i__1; ++i__) {
-	    temp = gc * work[l1 - 1] + gs * work[l1];
-	    work[l1] = nu * (work[l1 - 1] + temp) - work[l1];
-	    work[l1 - 1] = temp;
+	    temp = gc * work[l1-1 - 1] + gs * work[l1-1];
+	    work[l1-1] = nu * (work[l1-1 - 1] + temp) - work[l1-1];
+	    work[l1-1 - 1] = temp;
 	    l1 += i__;
 /* L720: */
 	}
 	i__1 = *n;
 	for (i__ = 1; i__ <= i__1; ++i__) {
-	    temp = gc * dmat[i__ + it1 * dmat_dim1] + gs * dmat[i__ + (it1 + 
-		    1) * dmat_dim1];
-	    dmat[i__ + (it1 + 1) * dmat_dim1] = nu * (dmat[i__ + it1 * 
-		    dmat_dim1] + temp) - dmat[i__ + (it1 + 1) * dmat_dim1];
-	    dmat[i__ + it1 * dmat_dim1] = temp;
+	    temp = gc * dmat[i__-1 + (it1-1) * dmat_dim1] + gs * dmat[(i__-1) + (it1)
+		    * dmat_dim1];
+	    dmat[i__-1 + (it1) * dmat_dim1] = nu * (dmat[i__-1 + (it1-1) * 
+		    dmat_dim1] + temp) - dmat[i__-1 + (it1) * dmat_dim1];
+	    dmat[i__-1 + (it1-1) * dmat_dim1] = temp;
 /* L721: */
 	}
     }
@@ -713,7 +704,7 @@ L798:
     l1 = l - it1;
     i__1 = it1;
     for (i__ = 1; i__ <= i__1; ++i__) {
-	work[l1] = work[l];
+	work[l1-1] = work[l-1];
 	++l;
 	++l1;
 /* L730: */
@@ -722,18 +713,18 @@ L798:
 /* update vector u and iact as necessary */
 /* Continue with updating the matrices J and R */
 
-    work[iwuv + it1] = work[iwuv + it1 + 1];
-    iact[it1] = iact[it1 + 1];
+    work[iwuv + it1-1] = work[iwuv + it1];
+    iact[it1-1] = iact[it1];
     ++it1;
     if (it1 < *nact) {
 	goto L797;
     }
 L799:
-    work[iwuv + *nact] = work[iwuv + *nact + 1];
-    work[iwuv + *nact + 1] = 0.;
-    iact[*nact] = 0;
+    work[iwuv + *nact-1] = work[iwuv + *nact];
+    work[iwuv + *nact] = 0.;
+    iact[*nact-1] = 0;
     --(*nact);
-    ++iter[2];
+    ++(*pIterDeleted);
     goto L55;
 L999:
     return 0;
