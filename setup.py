@@ -28,14 +28,9 @@ classifiers = [
 ]
 
 extensions = [Extension('quadprog', [
-    'quadprog/aind.c',
-    'quadprog/daxpy.c',
-    'quadprog/ddot.c',
-    'quadprog/dpofa.c',
-    'quadprog/dscal.c',
+    'quadprog/linear-algebra.c',
     'quadprog/quadprog.c',
     'quadprog/solve.QP.c',
-    'quadprog/util.c',
 ])]
 
 setup(

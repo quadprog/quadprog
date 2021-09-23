@@ -108,9 +108,6 @@ double d_sign(double *a, double *b) {
     double tmpa, tmpb, temp;
     int iwrm, iwrv, iwsv, iwuv, iwzv;
     int t1inf, t2min;
-    extern /* Subroutine */ int dpofa_(double *, int *, int *,
-	    int *), dpori_(double *, int *, int *), dposl_(
-	    double *, int *, int *, double *);
     int iwnbv;
     double vsmall;
 
@@ -172,13 +169,14 @@ L1:
 /* get the initial solution */
 
     if (*ierr == 0) {
-	dpofa_(&dmat[dmat_offset], fddmat, n, &info);
+	info = cholesky(*n, &dmat[dmat_offset]);
 	if (info != 0) {
 	    *ierr = 2;
 	    goto L999;
 	}
-	dposl_(&dmat[dmat_offset], fddmat, n, &dvec[1]);
-	dpori_(&dmat[dmat_offset], fddmat, n);
+	triangular_solve_transpose(*n, &dmat[dmat_offset], &dvec[1]);
+	triangular_solve(*n, &dmat[dmat_offset], &dvec[1]);
+	triangular_invert(*n, &dmat[dmat_offset]);
     } else {
 
 /* Matrix D is already factorized, so we have to multiply d first with */
