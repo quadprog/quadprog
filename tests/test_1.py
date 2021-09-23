@@ -66,16 +66,19 @@ def test_3():
 
 
 def test_4():
-    n = 66
+    n = 40
+
     X = np.full((n, n), 1e-20)
     X[np.diag_indices_from(X)] = 1.0
-    y = np.arange(n, dtype=float)
+    y = np.arange(n, dtype=float) / n
 
     random = np.random.RandomState(1)
     G = np.dot(X.T, X)
     a = np.dot(X, y)
-    C = np.identity(n)
-    b = y + random.rand(n)
-    
-    verify(G, a, C, b)
 
+    # The unconstrained solution is x = X^-1 y which is approximately y.
+    # Choose bound constraints on x such that roughly half of the constraints will be binding.
+    C = np.identity(n)
+    b = y + random.rand(n) - 0.5
+
+    verify(G, a, C, b)
