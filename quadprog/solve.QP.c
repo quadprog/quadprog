@@ -106,26 +106,19 @@ double calculate_vsmall() {
 	double *work, int *ierr)
 {
     /* System generated locals */
-    int dmat_dim1, amat_dim1;
     double d__1, d__2, d__3, d__4;
-
-    /* Builtin functions */
-    double sqrt(double);
 
     /* Local variables */
     int l, l1;
     double t1, gc, gs, nu, tt;
     int it1, nvl;
     double sum;
-    int info;
     double tmpa, tmpb, temp;
-    int iwrm, iwrv, iwsv, iwuv, iwzv;
     int t1inf, t2min;
-    int iwnbv;
     double vsmall = calculate_vsmall();
 
-    dmat_dim1 = *fddmat;
-    amat_dim1 = *fdamat;
+    int dmat_dim1 = *fddmat;
+    int amat_dim1 = *fdamat;
 
     int* pIterMain = &iter[0];
     int* pIterDeleted = &iter[1];
@@ -133,14 +126,14 @@ double calculate_vsmall() {
 /* calculate some constants, i.e., from which index on the different */
 /* quantities are stored in the work matrix */
 
-    int r = min(*n,*q);
-    l = *n + *n + r * (r + 5) / 2 + 1 + *q + *q;
-    iwzv = *n;
-    iwrv = iwzv + *n;
-    iwuv = iwrv + r;
-    iwrm = iwuv + r + 1;
-    iwsv = iwrm + r * (r + 1) / 2;
-    iwnbv = iwsv + *q;
+    int r = min(*n, *q);
+    int iwzv = *n;
+    int iwrv = iwzv + *n;
+    int iwuv = iwrv + r;
+    int iwrm = iwuv + r + 1;
+    int iwsv = iwrm + r * (r + 1) / 2;
+    int iwnbv = iwsv + *q;
+    l = iwnbv + *q
     double *zv = &work[iwzv];
     double *rv = &work[iwrv];
     double *uv = &work[iwuv];
@@ -168,8 +161,7 @@ double calculate_vsmall() {
 /* get the initial solution */
 
     if (*ierr == 0) {
-	info = cholesky(*n, dmat);
-	if (info != 0) {
+	if (cholesky(*n, dmat) != 0) {
 	    *ierr = 2;
 	    goto L999;
 	}
