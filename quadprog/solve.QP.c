@@ -100,7 +100,7 @@ double d_sign(double *a, double *b) {
     double sqrt(double);
 
     /* Local variables */
-    int l, r__, l1;
+    int l, l1;
     double t1, gc, gs, nu, tt;
     int it1, nvl;
     double sum;
@@ -115,11 +115,25 @@ double d_sign(double *a, double *b) {
     amat_dim1 = *fdamat;
 
     int* pIterMain = &iter[0];
-	int* pIterDeleted = &iter[1];
+    int* pIterDeleted = &iter[1];
 
-    /* Function Body */
-    r__ = min(*n,*q);
-    l = (*n << 1) + r__ * (r__ + 5) / 2 + (*q << 1) + 1;
+/* calculate some constants, i.e., from which index on the different */
+/* quantities are stored in the work matrix */
+
+    int r = min(*n,*q);
+    l = *n + *n + r * (r + 5) / 2 + 1 + *q + *q;
+    iwzv = *n;
+    iwrv = iwzv + *n;
+    iwuv = iwrv + r;
+    iwrm = iwuv + r + 1;
+    iwsv = iwrm + r * (r + 1) / 2;
+    iwnbv = iwsv + *q;
+    double *zv = &work[iwzv];
+    double *rv = &work[iwrv];
+    double *uv = &work[iwuv];
+    double *rm = &work[iwrm];
+    double *sv = &work[iwsv];
+    double *nbv = &work[iwnbv];
 
 /*     code gleaned from Powell's ZQPCVX routine to determine a small */
 /*     number  that can be assumed to be an upper bound on the relative */
@@ -206,16 +220,6 @@ L1:
     *crval = -(*crval) / 2.;
     *ierr = 0;
 
-/* calculate some constants, i.e., from which index on the different */
-/* quantities are stored in the work matrix */
-
-    iwzv = *n;
-    iwrv = iwzv + *n;
-    iwuv = iwrv + r__;
-    iwrm = iwuv + r__ + 1;
-    iwsv = iwrm + r__ * (r__ + 1) / 2;
-    iwnbv = iwsv + *q;
-
 /* calculate the norm of each column of the A matrix */
 
     for (int i = 0; i < *q; i++) {
@@ -224,7 +228,7 @@ L1:
 	    sum += amat[j + i * amat_dim1] * amat[j + i * amat_dim1];
 /* L52: */
 	}
-	work[iwnbv + i] = sqrt(sum);
+	nbv[i] = sqrt(sum);
 /* L51: */
     }
     *nact = 0;
@@ -250,9 +254,9 @@ L50:
 	    sum = 0.;
 	}
 	if (i >= *meq) {
-	    work[iwsv + i] = sum;
+	    sv[i] = sum;
 	} else {
-	    work[iwsv + i] = -abs(sum);
+	    sv[i] = -abs(sum);
 	    if (sum > 0.) {
 		for (int j = 0; j < *n; j++) {
 		    amat[j + i * amat_dim1] = -amat[j + i * amat_dim1];
@@ -268,7 +272,7 @@ L50:
 /* explicitly to zero */
 
     for (int i = 0; i < *nact; i++) {
-	work[iwsv + iact[i] - 1] = 0.;
+	sv[iact[i] - 1] = 0.;
 /* L70: */
     }
 
@@ -280,16 +284,16 @@ L50:
     nvl = 0;
     temp = 0.;
     for (int i = 0; i < *q; i++) {
-	if (work[iwsv + i] < temp * work[iwnbv + i]) {
+	if (sv[i] < temp * nbv[i]) {
 	    nvl = i + 1;
-	    temp = work[iwsv + i] / work[iwnbv + i];
+	    temp = sv[i] / nbv[i];
 	}
 /* L71: */
     }
 /* L72: */
     if (nvl == 0) {
 	for (int i = 0; i < *nact; i++) {
-	    lagr[iact[i] - 1] = work[iwuv + i];
+	    lagr[iact[i] - 1] = uv[i];
 /* L73: */
 	}
 	goto L999;
@@ -314,12 +318,12 @@ L55:
 
     l1 = iwzv;
     for (int i = 0; i < *n; i++) {
-	work[iwzv + i] = 0.;
+	zv[i] = 0.;
 /* L90: */
     }
     for (int j = *nact; j < *n; j++) {
 	for (int i = 0; i < *n; i++) {
-	    work[iwzv + i] += dmat[i + j * dmat_dim1] * work[j];
+	    zv[i] += dmat[i + j * dmat_dim1] * work[j];
 /* L93: */
 	}
 /* L92: */
@@ -334,12 +338,12 @@ L55:
 	l = iwrm + (i + 1) * (i + 4) / 2 - 1;
 	l1 = l - i - 1;
 	for (int j = i + 1; j <= *nact; j++) {
-	    sum -= work[l] * work[iwrv + j];
+	    sum -= work[l] * rv[j];
 	    l += j + 1;
 /* L96: */
 	}
 	sum /= work[l1];
-	work[iwrv + i] = sum;
+	rv[i] = sum;
 	if (iact[i] <= *meq) {
 	    goto L95;
 	}
@@ -358,15 +362,15 @@ L95:
 /* it1  stores in which component t1, the min of u/r, occurs. */
 
     if (! t1inf) {
-	t1 = work[iwuv + it1-1] / work[iwrv + it1-1];
+	t1 = uv[it1-1] / rv[it1-1];
 	for (int i = 0; i < *nact; i++) {
 	    if (iact[i] <= *meq) {
 		goto L100;
 	    }
-	    if (work[iwrv + i] <= 0.) {
+	    if (rv[i] <= 0.) {
 		goto L100;
 	    }
-	    temp = work[iwuv + i] / work[iwrv + i];
+	    temp = uv[i] / rv[i];
 	    if (temp < t1) {
 		t1 = temp;
 		it1 = i + 1;
@@ -380,7 +384,7 @@ L100:
 
     sum = 0.;
     for (int i = 0; i < *n; i++) {
-	sum += work[iwzv + i] * work[iwzv + i];
+	sum += zv[i] * zv[i];
 /* L110: */
     }
     if (abs(sum) <= vsmall) {
@@ -401,10 +405,10 @@ L100:
 /* then we continue at step 2(a) (marked by label 55) */
 
 	    for (int i = 0; i < *nact; i++) {
-		work[iwuv + i] -= t1 * work[iwrv + i];
+		uv[i] -= t1 * rv[i];
 /* L111: */
 	    }
-	    work[iwuv + *nact] += t1;
+	    uv[*nact] += t1;
 	    goto L700;
 	}
     } else {
@@ -415,10 +419,10 @@ L100:
 
 	sum = 0.;
 	for (int i = 0; i < *n; i++) {
-	    sum += work[iwzv + i] * amat[i + (nvl-1) * amat_dim1];
+	    sum += zv[i] * amat[i + (nvl-1) * amat_dim1];
 /* L120: */
 	}
-	tt = -work[iwsv + nvl-1] / sum;
+	tt = -sv[nvl-1] / sum;
 	t2min = 1;
 	if (! t1inf) {
 	    if (t1 < tt) {
@@ -430,15 +434,15 @@ L100:
 /* take step in primal and dual space */
 
 	for (int i = 0; i < *n; i++) {
-	    sol[i] += tt * work[iwzv + i];
+	    sol[i] += tt * zv[i];
 /* L130: */
 	}
-	*crval += tt * sum * (tt / 2. + work[iwuv + *nact]);
+	*crval += tt * sum * (tt / 2. + uv[*nact]);
 	for (int i = 0; i < *nact; i++) {
-	    work[iwuv + i] -= tt * work[iwrv + i];
+	    uv[i] -= tt * rv[i];
 /* L131: */
 	}
-	work[iwuv + *nact] += tt;
+	uv[*nact] += tt;
 
 /* if it was a full step, then we check wheter further constraints are */
 /* violated otherwise we can drop the current constraint and iterate once */
@@ -545,9 +549,9 @@ L160:
 /* L190: */
 	    }
 	    if (nvl > *meq) {
-		work[iwsv + nvl-1] = sum;
+		sv[nvl-1] = sum;
 	    } else {
-		work[iwsv + nvl-1] = -abs(sum);
+		sv[nvl-1] = -abs(sum);
 		if (sum > 0.) {
 		    for (int j = 0; j < *n; j++) {
 			amat[j + (nvl-1) * amat_dim1] = -amat[j + (nvl-1) * amat_dim1]
@@ -656,15 +660,15 @@ L798:
 /* update vector u and iact as necessary */
 /* Continue with updating the matrices J and R */
 
-    work[iwuv + it1-1] = work[iwuv + it1];
+    uv[it1-1] = uv[it1];
     iact[it1-1] = iact[it1];
     ++it1;
     if (it1 < *nact) {
 	goto L797;
     }
 L799:
-    work[iwuv + *nact-1] = work[iwuv + *nact];
-    work[iwuv + *nact] = 0.;
+    uv[*nact-1] = uv[*nact];
+    uv[*nact] = 0.;
     iact[*nact-1] = 0;
     --(*nact);
     ++(*pIterDeleted);
