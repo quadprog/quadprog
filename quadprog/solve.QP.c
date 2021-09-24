@@ -110,7 +110,6 @@ int qpgen2_(double *dmat, double *dvec, int n,
 {
     double d__1, d__2, d__3, d__4;
 
-    int l, l1;
     double t1, gc, gs, nu, tt;
     int it1, nvl;
     double sum;
@@ -131,7 +130,6 @@ int qpgen2_(double *dmat, double *dvec, int n,
     int iwrm = iwuv + r + 1;
     int iwsv = iwrm + r * (r + 1) / 2;
     int iwnbv = iwsv + q;
-    l = iwnbv + q;
     double *zv = &work[iwzv];
     double *rv = &work[iwrv];
     double *uv = &work[iwuv];
@@ -145,7 +143,7 @@ int qpgen2_(double *dmat, double *dvec, int n,
     for (int i = 0; i < n; i++) {
         work[i] = dvec[i];
     }
-    for (int i = n; i < l; i++) {
+    for (int i = n; i < iwnbv + q; i++) {
         work[i] = 0.;
     }
     for (int i = 0; i < q; i++) {
@@ -283,7 +281,6 @@ DONE_PARTIAL_STEP:
 
     // Now calculate z = J_2 d_2
 
-    l1 = iwzv;
     for (int i = 0; i < n; i++) {
         zv[i] = 0.;
     }
@@ -296,36 +293,31 @@ DONE_PARTIAL_STEP:
     // and r = R^{-1} d_1, check also if r has positive elements (among the
     // entries corresponding to inequalities constraints).
 
-    t1inf = 1;
     for (int i = *nact - 1; i >= 0; i--) {
         sum = work[i];
-        l = iwrm + (i + 1) * (i + 4) / 2 - 1;
-        l1 = l - i - 1;
+        int rm_offset = (i + 1) * (i + 2) / 2 - 1;
+        int k = 0;
         for (int j = i + 1; j <= *nact; j++) {
-            sum -= work[l] * rv[j];
-            l += j + 1;
+            sum -= rm[rm_offset + i + 1 + k] * rv[j];
+            k += j + 1;
         }
-        sum /= work[l1];
-        rv[i] = sum;
-        if (iact[i] > meq && sum > 0.) {
-            t1inf = 0;
-            it1 = i + 1;
-        }
+        rv[i] = sum / rm[rm_offset];
     }
 
     // if r has positive elements, find the partial step length t1, which is
     // the maximum step in dual space without violating dual feasibility.
     // it1  stores in which component t1, the min of u/r, occurs.
 
-    if (!t1inf) {
-        t1 = uv[it1 - 1] / rv[it1 - 1];
-        for (int i = 0; i < *nact; i++) {
-            if (iact[i] > meq && rv[i] > 0.) {
-                temp = uv[i] / rv[i];
-                if (temp < t1) {
-                    t1 = temp;
-                    it1 = i + 1;
-                }
+    t1inf = 1;
+    for (int i = 0; i < *nact; i++) {
+        if (iact[i] > meq && rv[i] > 0.) {
+            double current = uv[i] / rv[i];
+            if (t1inf) {
+                t1inf = 0;
+                t1 = current;
+                it1 = i + 1;
+            } else if (current < t1) {
+                it1 = i + 1;
             }
         }
     }
@@ -364,11 +356,9 @@ DONE_PARTIAL_STEP:
         }
         tt = -sv[nvl - 1] / sum;
         t2min = 1;
-        if (!t1inf) {
-            if (t1 < tt) {
-                tt = t1;
-                t2min = 0;
-            }
+        if (!t1inf && t1 < tt) {
+            tt = t1;
+            t2min = 0;
         }
 
         // take step in primal and dual space
@@ -396,7 +386,7 @@ DONE_PARTIAL_STEP:
             // into column (nact) of R
 
             for (int i = 0; i < *nact - 1; i++) {
-                work[iwrm + (*nact - 1) * *nact / 2 + i] = work[i];
+                rm[(*nact - 1) * *nact / 2 + i] = work[i];
             }
 
             // if now nact=n, then we just have to add the last element to the new
@@ -406,60 +396,55 @@ DONE_PARTIAL_STEP:
             // last element of the new row of R and J is accordingly updated by the
             // Givens transformations.
 
-            l = iwrm + (*nact) * (*nact + 1) / 2;
-            if (*nact == n) {
-                work[l - 1] = work[n - 1];
-            } else {
-                for (int i = n - 1; i >= *nact; i--) {
-                    // we have to find the Givens rotation which will reduce the element
-                    // (l1) of d to zero.
-                    // if it is already zero we don't have to do anything, except of
-                    // decreasing l1
+            for (int i = n - 1; i >= *nact; i--) {
+                // we have to find the Givens rotation which will reduce the element
+                // (l1) of d to zero.
+                // if it is already zero we don't have to do anything, except of
+                // decreasing l1
 
-                    if (work[i] != 0.) {
-                        // Computing MAX
-                        d__3 = (d__1 = work[i - 1], abs(d__1)), d__4 = (d__2 = work[i], abs(d__2));
-                        gc = max(d__3,d__4);
-                        // Computing MIN
-                        d__3 = (d__1 = work[i - 1], abs(d__1)), d__4 = (d__2 = work[i], abs(d__2));
-                        gs = min(d__3,d__4);
-                        d__1 = gc * sqrt((gs / gc) * (gs / gc) + 1);
-                        temp = d_sign(&d__1, &work[i - 1]);
-                        gc = work[i - 1] / temp;
-                        gs = work[i] / temp;
+                if (work[i] != 0.) {
+                    // Computing MAX
+                    d__3 = (d__1 = work[i - 1], abs(d__1)), d__4 = (d__2 = work[i], abs(d__2));
+                    gc = max(d__3,d__4);
+                    // Computing MIN
+                    d__3 = (d__1 = work[i - 1], abs(d__1)), d__4 = (d__2 = work[i], abs(d__2));
+                    gs = min(d__3,d__4);
+                    d__1 = gc * sqrt((gs / gc) * (gs / gc) + 1);
+                    temp = d_sign(&d__1, &work[i - 1]);
+                    gc = work[i - 1] / temp;
+                    gs = work[i] / temp;
 
-                        // The Givens rotation is done with the matrix (gc gs, gs -gc).
-                        // If gc is one, then element (i) of d is zero compared with element
-                        // (l1-1). Hence we don't have to do anything.
-                        // If gc is zero, then we just have to switch column (i) and column (i-1)
-                        // of J. Since we only switch columns in J, we have to be careful how we
-                        // update d depending on the sign of gs.
-                        // Otherwise we have to apply the Givens rotation to these columns.
-                        // The i-1 element of d has to be updated to temp.
+                    // The Givens rotation is done with the matrix (gc gs, gs -gc).
+                    // If gc is one, then element (i) of d is zero compared with element
+                    // (l1-1). Hence we don't have to do anything.
+                    // If gc is zero, then we just have to switch column (i) and column (i-1)
+                    // of J. Since we only switch columns in J, we have to be careful how we
+                    // update d depending on the sign of gs.
+                    // Otherwise we have to apply the Givens rotation to these columns.
+                    // The i-1 element of d has to be updated to temp.
 
-                        if (gc == 0.) {
-                            work[i - 1] = gs * temp;
-                            for (int j = 0; j < n; j++) {
-                                temp = dmat[j + (i - 1) * n];
-                                dmat[j + (i - 1) * n] = dmat[j + i * n];
-                                dmat[j + i * n] = temp;
-                            }
-                        } else if (gc != 1.) {
-                            work[i - 1] = temp;
-                            nu = gs / (gc + 1.);
-                            for (int j = 0; j < n; j++) {
-                                temp = gc * dmat[j + (i - 1) * n] + gs * dmat[j + i * n];
-                                dmat[j + i * n] = nu * (dmat[j + (i - 1) * n] + temp) - dmat[j + i * n];
-                                dmat[j + (i - 1) * n] = temp;
-                            }
+                    if (gc == 0.) {
+                        work[i - 1] = gs * temp;
+                        for (int j = 0; j < n; j++) {
+                            temp = dmat[j + (i - 1) * n];
+                            dmat[j + (i - 1) * n] = dmat[j + i * n];
+                            dmat[j + i * n] = temp;
+                        }
+                    } else if (gc != 1.) {
+                        work[i - 1] = temp;
+                        nu = gs / (gc + 1.);
+                        for (int j = 0; j < n; j++) {
+                            temp = gc * dmat[j + (i - 1) * n] + gs * dmat[j + i * n];
+                            dmat[j + i * n] = nu * (dmat[j + (i - 1) * n] + temp) - dmat[j + i * n];
+                            dmat[j + (i - 1) * n] = temp;
                         }
                     }
                 }
-
-                // l is still pointing to element (nact,nact) of the matrix R.
-                // So store d(nact) in R(nact,nact)
-                work[l - 1] = work[*nact - 1];
             }
+
+            // So store d(nact) in R(nact,nact)
+            rm[(*nact) * (*nact + 1) / 2 - 1] = work[*nact - 1];
+
             goto DONE_FULL_STEP;
         } else {
             // we took a partial step in dual space. Thus drop constraint it1,
@@ -499,19 +484,19 @@ DONE_PARTIAL_STEP:
         // l  will point to element (1,it1+1) of R
         // l1 will point to element (it1+1,it1+1) of R
 
-        l = iwrm + it1 * (it1 + 1) / 2 + 1;
-        l1 = l + it1;
-        if (work[l1-1] != 0.) {
+        int l = it1 * (it1 + 1) / 2;
+        int l1 = l + it1;
+        if (rm[l1] != 0.) {
             // Computing MAX
-            d__3 = (d__1 = work[l1-1 - 1], abs(d__1)), d__4 = (d__2 = work[l1-1], abs(d__2));
+            d__3 = (d__1 = rm[l1 - 1], abs(d__1)), d__4 = (d__2 = rm[l1], abs(d__2));
             gc = max(d__3,d__4);
             // Computing MIN
-            d__3 = (d__1 = work[l1-1 - 1], abs(d__1)), d__4 = (d__2 = work[l1-1], abs(d__2));
+            d__3 = (d__1 = rm[l1 - 1], abs(d__1)), d__4 = (d__2 = rm[l1], abs(d__2));
             gs = min(d__3,d__4);
             d__1 = gc * sqrt((gs / gc) * (gs / gc) + 1);
-            temp = d_sign(&d__1, &work[l1-1 - 1]);
-            gc = work[l1-1 - 1] / temp;
-            gs = work[l1-1] / temp;
+            temp = d_sign(&d__1, &rm[l1 - 1]);
+            gc = rm[l1 - 1] / temp;
+            gs = rm[l1] / temp;
 
             // The Givens rotatin is done with the matrix (gc gs, gs -gc).
             // If gc is one, then element (it1+1,it1+1) of R is zero compared with
@@ -523,9 +508,9 @@ DONE_PARTIAL_STEP:
 
             if (gc == 0.) {
                 for (int i = it1 + 1; i <= *nact; i++) {
-                    temp = work[l1-1 - 1];
-                    work[l1-1 - 1] = work[l1-1];
-                    work[l1-1] = temp;
+                    temp = rm[l1 - 1];
+                    rm[l1 - 1] = rm[l1];
+                    rm[l1] = temp;
                     l1 += i;
                 }
                 for (int i = 0; i < n; i++) {
@@ -536,9 +521,9 @@ DONE_PARTIAL_STEP:
             } else if (gc != 1.) {
                 nu = gs / (gc + 1.);
                 for (int i = it1 + 1; i <= *nact; i++) {
-                    temp = gc * work[l1-1 - 1] + gs * work[l1-1];
-                    work[l1-1] = nu * (work[l1-1 - 1] + temp) - work[l1-1];
-                    work[l1-1 - 1] = temp;
+                    temp = gc * rm[l1 - 1] + gs * rm[l1];
+                    rm[l1] = nu * (rm[l1 - 1] + temp) - rm[l1];
+                    rm[l1 - 1] = temp;
                     l1 += i;
                 }
                 for (int i = 0; i < n; i++) {
@@ -554,7 +539,7 @@ DONE_PARTIAL_STEP:
         // and stored in l.
 
         for (int i = 0; i < it1; i++) {
-            work[l-1 - it1 + i] = work[l-1 + i];
+            rm[l + i - it1] = rm[l + i];
         }
 
         // update vector u and iact as necessary
