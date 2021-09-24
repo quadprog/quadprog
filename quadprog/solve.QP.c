@@ -163,7 +163,7 @@ int qpgen2_(double *dmat, double *dvec, int *
     if (*ierr == 0) {
         if (cholesky(*n, dmat) != 0) {
             *ierr = 2;
-            goto L999;
+            return 0;
         }
         triangular_solve_transpose(*n, dmat, dvec);
         triangular_solve(*n, dmat, dvec);
@@ -217,7 +217,7 @@ int qpgen2_(double *dmat, double *dvec, int *
     *pIterMain = 0;
     *pIterDeleted = 0;
 
-L50:
+DONE_FULL_STEP:
 
     // start a new iteration
 
@@ -271,14 +271,15 @@ L50:
         for (int i = 0; i < *nact; i++) {
             lagr[iact[i] - 1] = uv[i];
         }
-        goto L999;
+        return 0;
     }
+
+DONE_PARTIAL_STEP:
 
     // calculate d=J^Tn^+ where n^+ is the normal vector of the violated
     // constraint. J is stored in dmat in this implementation!!
     // if we drop a constraint, we have to jump back here.
 
-L55:
     for (int i = 0; i < *n; i++) {
         sum = 0.;
         for (int j = 0; j < *n; j++) {
@@ -313,16 +314,10 @@ L55:
         }
         sum /= work[l1];
         rv[i] = sum;
-        if (iact[i] <= *meq) {
-            goto L95;
+        if (iact[i] > *meq && sum > 0.) {
+            t1inf = 0;
+            it1 = i + 1;
         }
-        if (sum <= 0.) {
-            goto L95;
-        }
-        t1inf = 0;
-        it1 = i + 1;
-L95:
-        ;
     }
 
     // if r has positive elements, find the partial step length t1, which is
@@ -332,19 +327,13 @@ L95:
     if (!t1inf) {
         t1 = uv[it1 - 1] / rv[it1 - 1];
         for (int i = 0; i < *nact; i++) {
-            if (iact[i] <= *meq) {
-                goto L100;
+            if (iact[i] > *meq && rv[i] > 0.) {
+                temp = uv[i] / rv[i];
+                if (temp < t1) {
+                    t1 = temp;
+                    it1 = i + 1;
+                }
             }
-            if (rv[i] <= 0.) {
-                goto L100;
-            }
-            temp = uv[i] / rv[i];
-            if (temp < t1) {
-                t1 = temp;
-                it1 = i + 1;
-            }
-L100:
-            ;
         }
     }
 
@@ -360,20 +349,18 @@ L100:
 
         if (t1inf) {
             // No step in dual space possible either, problem is not solvable
-
             *ierr = 1;
-            goto L999;
-        } else {
-            // we take a partial step in dual space and drop constraint it1,
-            // that is, we drop the it1-th active constraint.
-            // then we continue at step 2(a) (marked by label 55)
-
-            for (int i = 0; i < *nact; i++) {
-                uv[i] -= t1 * rv[i];
-            }
-            uv[*nact] += t1;
-            goto L700;
+            return 0;
         }
+
+        // we take a partial step in dual space and drop constraint it1,
+        // that is, we drop the it1-th active constraint.
+        // then we continue at step 2(a) (marked by label 55)
+
+        for (int i = 0; i < *nact; i++) {
+            uv[i] -= t1 * rv[i];
+        }
+        uv[*nact] += t1;
     } else {
         // compute full step length t2, minimum step in primal space such that */
         // the constraint becomes feasible. */
@@ -437,58 +424,51 @@ L100:
                     // if it is already zero we don't have to do anything, except of
                     // decreasing l1
 
-                    if (work[i] == 0.) {
-                        goto L160;
-                    }
-                    // Computing MAX
-                    d__3 = (d__1 = work[i - 1], abs(d__1)), d__4 = (d__2 =
-                        work[i], abs(d__2));
-                    gc = max(d__3,d__4);
-                    // Computing MIN
-                    d__3 = (d__1 = work[i - 1], abs(d__1)), d__4 = (d__2 =
-                        work[i], abs(d__2));
-                    gs = min(d__3,d__4);
-                    d__1 = gc * sqrt((gs / gc) * (gs / gc) + 1);
-                    temp = d_sign(&d__1, &work[i - 1]);
-                    gc = work[i - 1] / temp;
-                    gs = work[i] / temp;
+                    if (work[i] != 0.) {
+                        // Computing MAX
+                        d__3 = (d__1 = work[i - 1], abs(d__1)), d__4 = (d__2 = work[i], abs(d__2));
+                        gc = max(d__3,d__4);
+                        // Computing MIN
+                        d__3 = (d__1 = work[i - 1], abs(d__1)), d__4 = (d__2 = work[i], abs(d__2));
+                        gs = min(d__3,d__4);
+                        d__1 = gc * sqrt((gs / gc) * (gs / gc) + 1);
+                        temp = d_sign(&d__1, &work[i - 1]);
+                        gc = work[i - 1] / temp;
+                        gs = work[i] / temp;
 
-                    // The Givens rotation is done with the matrix (gc gs, gs -gc).
-                    // If gc is one, then element (i) of d is zero compared with element
-                    // (l1-1). Hence we don't have to do anything.
-                    // If gc is zero, then we just have to switch column (i) and column (i-1)
-                    // of J. Since we only switch columns in J, we have to be careful how we
-                    // update d depending on the sign of gs.
-                    // Otherwise we have to apply the Givens rotation to these columns.
-                    // The i-1 element of d has to be updated to temp.
+                        // The Givens rotation is done with the matrix (gc gs, gs -gc).
+                        // If gc is one, then element (i) of d is zero compared with element
+                        // (l1-1). Hence we don't have to do anything.
+                        // If gc is zero, then we just have to switch column (i) and column (i-1)
+                        // of J. Since we only switch columns in J, we have to be careful how we
+                        // update d depending on the sign of gs.
+                        // Otherwise we have to apply the Givens rotation to these columns.
+                        // The i-1 element of d has to be updated to temp.
 
-                    if (gc == 1.) {
-                        goto L160;
-                    }
-                    if (gc == 0.) {
-                        work[i - 1] = gs * temp;
-                        for (int j = 0; j < *n; j++) {
-                            temp = dmat[j + (i - 1) * dmat_dim1];
-                            dmat[j + (i - 1) * dmat_dim1] = dmat[j + i * dmat_dim1];
-                            dmat[j + i * dmat_dim1] = temp;
-                        }
-                    } else {
-                        work[i - 1] = temp;
-                        nu = gs / (gc + 1.);
-                        for (int j = 0; j < *n; j++) {
-                            temp = gc * dmat[j + (i - 1) * dmat_dim1] + gs * dmat[j + i * dmat_dim1];
-                            dmat[j + i * dmat_dim1] = nu * (dmat[j + (i - 1) * dmat_dim1] + temp) - dmat[j + i * dmat_dim1];
-                            dmat[j + (i - 1) * dmat_dim1] = temp;
+                        if (gc == 0.) {
+                            work[i - 1] = gs * temp;
+                            for (int j = 0; j < *n; j++) {
+                                temp = dmat[j + (i - 1) * dmat_dim1];
+                                dmat[j + (i - 1) * dmat_dim1] = dmat[j + i * dmat_dim1];
+                                dmat[j + i * dmat_dim1] = temp;
+                            }
+                        } else if (gc != 1.) {
+                            work[i - 1] = temp;
+                            nu = gs / (gc + 1.);
+                            for (int j = 0; j < *n; j++) {
+                                temp = gc * dmat[j + (i - 1) * dmat_dim1] + gs * dmat[j + i * dmat_dim1];
+                                dmat[j + i * dmat_dim1] = nu * (dmat[j + (i - 1) * dmat_dim1] + temp) - dmat[j + i * dmat_dim1];
+                                dmat[j + (i - 1) * dmat_dim1] = temp;
+                            }
                         }
                     }
-L160:
-                    ;
                 }
 
                 // l is still pointing to element (nact,nact) of the matrix R.
                 // So store d(nact) in R(nact,nact)
                 work[l - 1] = work[*nact - 1];
             }
+            goto DONE_FULL_STEP;
         } else {
             // we took a partial step in dual space. Thus drop constraint it1,
             // that is, we drop the it1-th active constraint.
@@ -511,111 +491,92 @@ L160:
                     bvec[nvl - 1] = -bvec[nvl - 1];
                 }
             }
-            goto L700;
         }
     }
-    goto L50;
 
     // Drop constraint it1
 
-L700:
-
     // if it1 = nact it is only necessary to update the vector u and nact
+    for (; it1 < *nact; it1++) {
+        // After updating one row of R (column of J) we will also come back here
 
-    if (it1 == *nact) {
-        goto L799;
-    }
+        // we have to find the Givens rotation which will reduce the element
+        // (it1+1,it1+1) of R to zero.
+        // if it is already zero we don't have to do anything except of updating
+        // u, iact, and shifting column (it1+1) of R to column (it1)
+        // l  will point to element (1,it1+1) of R
+        // l1 will point to element (it1+1,it1+1) of R
 
-    // After updating one row of R (column of J) we will also come back here
+        l = iwrm + it1 * (it1 + 1) / 2 + 1;
+        l1 = l + it1;
+        if (work[l1-1] != 0.) {
+            // Computing MAX
+            d__3 = (d__1 = work[l1-1 - 1], abs(d__1)), d__4 = (d__2 = work[l1-1], abs(d__2));
+            gc = max(d__3,d__4);
+            // Computing MIN
+            d__3 = (d__1 = work[l1-1 - 1], abs(d__1)), d__4 = (d__2 = work[l1-1], abs(d__2));
+            gs = min(d__3,d__4);
+            d__1 = gc * sqrt((gs / gc) * (gs / gc) + 1);
+            temp = d_sign(&d__1, &work[l1-1 - 1]);
+            gc = work[l1-1 - 1] / temp;
+            gs = work[l1-1] / temp;
 
-L797:
+            // The Givens rotatin is done with the matrix (gc gs, gs -gc).
+            // If gc is one, then element (it1+1,it1+1) of R is zero compared with
+            // element (it1,it1+1). Hence we don't have to do anything.
+            // if gc is zero, then we just have to switch row (it1) and row (it1+1)
+            // of R and column (it1) and column (it1+1) of J. Since we swithc rows in
+            // R and columns in J, we can ignore the sign of gs.
+            // Otherwise we have to apply the Givens rotation to these rows/columns.
 
-    // we have to find the Givens rotation which will reduce the element
-    // (it1+1,it1+1) of R to zero.
-    // if it is already zero we don't have to do anything except of updating
-    // u, iact, and shifting column (it1+1) of R to column (it1)
-    // l  will point to element (1,it1+1) of R
-    // l1 will point to element (it1+1,it1+1) of R
-
-    l = iwrm + it1 * (it1 + 1) / 2 + 1;
-    l1 = l + it1;
-    if (work[l1-1] == 0.) {
-        goto L798;
-    }
-    // Computing MAX
-    d__3 = (d__1 = work[l1-1 - 1], abs(d__1)), d__4 = (d__2 = work[l1-1], abs(d__2));
-    gc = max(d__3,d__4);
-    // Computing MIN
-    d__3 = (d__1 = work[l1-1 - 1], abs(d__1)), d__4 = (d__2 = work[l1-1], abs(d__2));
-    gs = min(d__3,d__4);
-    d__1 = gc * sqrt((gs / gc) * (gs / gc) + 1);
-    temp = d_sign(&d__1, &work[l1-1 - 1]);
-    gc = work[l1-1 - 1] / temp;
-    gs = work[l1-1] / temp;
-
-    // The Givens rotatin is done with the matrix (gc gs, gs -gc).
-    // If gc is one, then element (it1+1,it1+1) of R is zero compared with
-    // element (it1,it1+1). Hence we don't have to do anything.
-    // if gc is zero, then we just have to switch row (it1) and row (it1+1)
-    // of R and column (it1) and column (it1+1) of J. Since we swithc rows in
-    // R and columns in J, we can ignore the sign of gs.
-    // Otherwise we have to apply the Givens rotation to these rows/columns.
-
-    if (gc == 1.) {
-        goto L798;
-    }
-    if (gc == 0.) {
-        for (int i = it1 + 1; i <= *nact; i++) {
-            temp = work[l1-1 - 1];
-            work[l1-1 - 1] = work[l1-1];
-            work[l1-1] = temp;
-            l1 += i;
+            if (gc == 0.) {
+                for (int i = it1 + 1; i <= *nact; i++) {
+                    temp = work[l1-1 - 1];
+                    work[l1-1 - 1] = work[l1-1];
+                    work[l1-1] = temp;
+                    l1 += i;
+                }
+                for (int i = 0; i < *n; i++) {
+                    temp = dmat[i + (it1-1) * dmat_dim1];
+                    dmat[i + (it1-1) * dmat_dim1] = dmat[i + (it1) * dmat_dim1];
+                    dmat[i + (it1) * dmat_dim1] = temp;
+                }
+            } else if (gc != 1.) {
+                nu = gs / (gc + 1.);
+                for (int i = it1 + 1; i <= *nact; i++) {
+                    temp = gc * work[l1-1 - 1] + gs * work[l1-1];
+                    work[l1-1] = nu * (work[l1-1 - 1] + temp) - work[l1-1];
+                    work[l1-1 - 1] = temp;
+                    l1 += i;
+                }
+                for (int i = 0; i < *n; i++) {
+                    temp = gc * dmat[i + (it1-1) * dmat_dim1] + gs * dmat[i + (it1) * dmat_dim1];
+                    dmat[i + (it1) * dmat_dim1] = nu * (dmat[i + (it1-1) * dmat_dim1] + temp) - dmat[i + (it1) * dmat_dim1];
+                    dmat[i + (it1-1) * dmat_dim1] = temp;
+                }
+            }
         }
-        for (int i = 0; i < *n; i++) {
-            temp = dmat[i + (it1-1) * dmat_dim1];
-            dmat[i + (it1-1) * dmat_dim1] = dmat[i + (it1) * dmat_dim1];
-            dmat[i + (it1) * dmat_dim1] = temp;
+
+        // shift column (it1+1) of R to column (it1) (that is, the first it1
+        // elements). The posit1on of element (1,it1+1) of R was calculated above
+        // and stored in l.
+
+        for (int i = 0; i < it1; i++) {
+            work[l-1 - it1 + i] = work[l-1 + i];
         }
-    } else {
-        nu = gs / (gc + 1.);
-        for (int i = it1 + 1; i <= *nact; i++) {
-            temp = gc * work[l1-1 - 1] + gs * work[l1-1];
-            work[l1-1] = nu * (work[l1-1 - 1] + temp) - work[l1-1];
-            work[l1-1 - 1] = temp;
-            l1 += i;
-        }
-        for (int i = 0; i < *n; i++) {
-            temp = gc * dmat[i + (it1-1) * dmat_dim1] + gs * dmat[i + (it1) * dmat_dim1];
-            dmat[i + (it1) * dmat_dim1] = nu * (dmat[i + (it1-1) * dmat_dim1] + temp) - dmat[i + (it1) * dmat_dim1];
-            dmat[i + (it1-1) * dmat_dim1] = temp;
-        }
+
+        // update vector u and iact as necessary
+        // Continue with updating the matrices J and R
+
+        uv[it1-1] = uv[it1];
+        iact[it1-1] = iact[it1];
     }
 
-    // shift column (it1+1) of R to column (it1) (that is, the first it1
-    // elements). The posit1on of element (1,it1+1) of R was calculated above
-    // and stored in l.
-
-L798:
-    for (int i = 0; i < it1; i++) {
-        work[l-1 - it1 + i] = work[l-1 + i];
-    }
-
-    // update vector u and iact as necessary
-    // Continue with updating the matrices J and R
-
-    uv[it1-1] = uv[it1];
-    iact[it1-1] = iact[it1];
-    ++it1;
-    if (it1 < *nact) {
-        goto L797;
-    }
-L799:
     uv[*nact-1] = uv[*nact];
     uv[*nact] = 0.;
     iact[*nact-1] = 0;
     --(*nact);
     ++(*pIterDeleted);
-    goto L55;
-L999:
-    return 0;
+
+    goto DONE_PARTIAL_STEP;
 }
