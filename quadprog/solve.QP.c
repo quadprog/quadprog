@@ -29,17 +29,16 @@
 /*  dmat   nxn matrix, the matrix D from above (dp) */
 /*         *** WILL BE DESTROYED ON EXIT *** */
 /*         The user has two possibilities: */
-/*         a) Give D (ierr=0), in this case we use routines from LINPACK */
+/*         a) Give D (factorized=0), in this case we use routines from LINPACK */
 /*            to decompose D. */
 /*         b) To get the algorithm started we need R^-1, where D=R^TR. */
 /*            So if it is cheaper to calculate R^-1 in another way (D may */
 /*            be a band matrix) then with the general routine, the user */
-/*            may pass R^{-1}.  Indicated by ierr not equal to zero. */
+/*            may pass R^{-1}.  Indicated by factorized not equal to zero. */
 /*  dvec   nx1 vector, the vector d from above (dp) */
 /*         *** WILL BE DESTROYED ON EXIT *** */
 /*         contains on exit the solution to the initial, i.e., */
 /*         unconstrained problem */
-/*  fddmat scalar, the leading dimension of the matrix dmat */
 /*  n      the dimension of dmat and dvec (int) */
 /*  amat   nxq matrix, the matrix A from above (dp) [ A=(A1 A2)^T ] */
 /*         *** ENTRIES CORRESPONDING TO EQUALITY CONSTRAINTS MAY HAVE */
@@ -48,13 +47,11 @@
 /*         [ b = (b1^T b2^T)^T ] */
 /*         *** ENTRIES CORRESPONDING TO EQUALITY CONSTRAINTS MAY HAVE */
 /*             CHANGED SIGNES ON EXIT *** */
-/*  fdamat the first dimension of amat as declared in the calling program. */
-/*         fdamat >= n !! */
 /*  q      integer, the number of constraints. */
 /*  meq    integer, the number of equality constraints, 0 <= meq <= q. */
-/*  ierr   integer, code for the status of the matrix D: */
-/*            ierr =  0, we have to decompose D */
-/*            ierr != 0, D is already decomposed into D=R^TR and we were */
+/*  factorized   integer, code for the status of the matrix D: */
+/*            factorized =  0, we have to decompose D */
+/*            factorized != 0, D is already decomposed into D=R^TR and we were */
 /*                       given R^{-1}. */
 
 /*  Output parameter: */
@@ -67,11 +64,12 @@
 /*  iter  2x1 vector, first component gives the number of "main" */
 /*        iterations, the second one says how many constraints were */
 /*        deleted after they became active */
-/*  ierr  integer, error code on exit, if */
-/*           ierr = 0, no problems */
-/*           ierr = 1, the minimization problem has no solution */
-/*           ierr = 2, problems with decomposing D, in this case sol */
-/*                     contains garbage!! */
+
+/*  Return value: */
+/*        0, no problems */
+/*        1, the minimization problem has no solution */
+/*        2, problems with decomposing D, in this case sol */
+/*           contains garbage!! */
 
 /*  Working space: */
 /*  work  vector with length at least 2*n+r*(r+5)/2 + 2*q +1 */
@@ -104,11 +102,11 @@ double calculate_vsmall() {
     return vsmall;
 }
 
-int qpgen2_(double *dmat, double *dvec, int *
-    fddmat, int *n, double *sol, double *lagr, double *
-    crval, double *amat, double *bvec, int *fdamat, int *
-    q, int *meq, int *iact, int *nact, int *iter,
-    double *work, int *ierr)
+int qpgen2_(double *dmat, double *dvec, int n,
+    double *sol, double *lagr, double *crval,
+    double *amat, double *bvec, int q, int meq,
+    int *iact, int *nact, int *iter,
+    double *work, int factorized)
 {
     double d__1, d__2, d__3, d__4;
 
@@ -116,12 +114,9 @@ int qpgen2_(double *dmat, double *dvec, int *
     double t1, gc, gs, nu, tt;
     int it1, nvl;
     double sum;
-    double tmpa, tmpb, temp;
+    double temp;
     int t1inf, t2min;
     double vsmall = calculate_vsmall();
-
-    int dmat_dim1 = *fddmat;
-    int amat_dim1 = *fdamat;
 
     int* pIterMain = &iter[0];
     int* pIterDeleted = &iter[1];
@@ -129,14 +124,14 @@ int qpgen2_(double *dmat, double *dvec, int *
     // calculate some constants, i.e., from which index on the different
     // quantities are stored in the work matrix
 
-    int r = min(*n, *q);
-    int iwzv = *n;
-    int iwrv = iwzv + *n;
+    int r = min(n, q);
+    int iwzv = n;
+    int iwrv = iwzv + n;
     int iwuv = iwrv + r;
     int iwrm = iwuv + r + 1;
     int iwsv = iwrm + r * (r + 1) / 2;
-    int iwnbv = iwsv + *q;
-    l = iwnbv + *q;
+    int iwnbv = iwsv + q;
+    l = iwnbv + q;
     double *zv = &work[iwzv];
     double *rv = &work[iwrv];
     double *uv = &work[iwuv];
@@ -147,43 +142,42 @@ int qpgen2_(double *dmat, double *dvec, int *
     // store the initial dvec to calculate below the unconstrained minima of
     // the critical value.
 
-    for (int i = 0; i < *n; i++) {
+    for (int i = 0; i < n; i++) {
         work[i] = dvec[i];
     }
-    for (int i = *n; i < l; i++) {
+    for (int i = n; i < l; i++) {
         work[i] = 0.;
     }
-    for (int i = 0; i < *q; i++) {
+    for (int i = 0; i < q; i++) {
         iact[i] = 0;
         lagr[i] = 0.;
     }
 
     // get the initial solution
 
-    if (*ierr == 0) {
-        if (cholesky(*n, dmat) != 0) {
-            *ierr = 2;
-            return 0;
+    if (!factorized) {
+        if (cholesky(n, dmat) != 0) {
+            return 2;
         }
-        triangular_solve_transpose(*n, dmat, dvec);
-        triangular_solve(*n, dmat, dvec);
-        triangular_invert(*n, dmat);
+        triangular_solve_transpose(n, dmat, dvec);
+        triangular_solve(n, dmat, dvec);
+        triangular_invert(n, dmat);
     } else {
         // Matrix D is already factorized, so we have to multiply d first with
         // R^-T and then with R^-1.  R^-1 is stored in the upper half of the
         // array dmat.
 
-        for (int j = 0; j < *n; j++) {
+        for (int j = 0; j < n; j++) {
             sol[j] = 0.;
             for (int i = 0; i <= j; i++) {
-                sol[j] += dmat[i + j * dmat_dim1] * dvec[i];
+                sol[j] += dmat[i + j * n] * dvec[i];
             }
         }
 
-        for (int j = 0; j < *n; j++) {
+        for (int j = 0; j < n; j++) {
             dvec[j] = 0.;
-            for (int i = j; i < *n; i++) {
-                dvec[j] += dmat[j + i * dmat_dim1] * sol[i];
+            for (int i = j; i < n; i++) {
+                dvec[j] += dmat[j + i * n] * sol[i];
             }
         }
     }
@@ -192,23 +186,22 @@ int qpgen2_(double *dmat, double *dvec, int *
     // calculate value of the criterion at unconstrained minima
 
     *crval = 0.;
-    for (int j = 0; j < *n; j++) {
+    for (int j = 0; j < n; j++) {
         sol[j] = dvec[j];
         *crval += work[j] * sol[j];
         work[j] = 0.;
-        for (int i = j + 1; i < *n; i++) {
-            dmat[i + j * dmat_dim1] = 0.;
+        for (int i = j + 1; i < n; i++) {
+            dmat[i + j * n] = 0.;
         }
     }
     *crval = -(*crval) / 2.;
-    *ierr = 0;
 
     // calculate the norm of each column of the A matrix
 
-    for (int i = 0; i < *q; i++) {
+    for (int i = 0; i < q; i++) {
         sum = 0.;
-        for (int j = 0; j < *n; j++) {
-            sum += amat[j + i * amat_dim1] * amat[j + i * amat_dim1];
+        for (int j = 0; j < n; j++) {
+            sum += amat[j + i * n] * amat[j + i * n];
         }
         nbv[i] = sqrt(sum);
     }
@@ -227,21 +220,21 @@ DONE_FULL_STEP:
     // for the equality constraints we have to check whether the normal
     // vector has to be negated (as well as bvec in that case)
 
-    for (int i = 0; i < *q; i++) {
+    for (int i = 0; i < q; i++) {
         sum = -bvec[i];
-        for (int j = 0; j < *n; j++) {
-            sum += amat[j + i * amat_dim1] * sol[j];
+        for (int j = 0; j < n; j++) {
+            sum += amat[j + i * n] * sol[j];
         }
         if (abs(sum) < vsmall) {
             sum = 0.;
         }
-        if (i >= *meq) {
+        if (i >= meq) {
             sv[i] = sum;
         } else {
             sv[i] = -abs(sum);
             if (sum > 0.) {
-                for (int j = 0; j < *n; j++) {
-                    amat[j + i * amat_dim1] = -amat[j + i * amat_dim1];
+                for (int j = 0; j < n; j++) {
+                    amat[j + i * n] = -amat[j + i * n];
                 }
                 bvec[i] = -bvec[i];
             }
@@ -261,7 +254,7 @@ DONE_FULL_STEP:
 
     nvl = 0;
     temp = 0.;
-    for (int i = 0; i < *q; i++) {
+    for (int i = 0; i < q; i++) {
         if (sv[i] < temp * nbv[i]) {
             nvl = i + 1;
             temp = sv[i] / nbv[i];
@@ -280,10 +273,10 @@ DONE_PARTIAL_STEP:
     // constraint. J is stored in dmat in this implementation!!
     // if we drop a constraint, we have to jump back here.
 
-    for (int i = 0; i < *n; i++) {
+    for (int i = 0; i < n; i++) {
         sum = 0.;
-        for (int j = 0; j < *n; j++) {
-            sum += dmat[j + i * dmat_dim1] * amat[j + (nvl - 1) * amat_dim1];
+        for (int j = 0; j < n; j++) {
+            sum += dmat[j + i * n] * amat[j + (nvl - 1) * n];
         }
         work[i] = sum;
     }
@@ -291,12 +284,12 @@ DONE_PARTIAL_STEP:
     // Now calculate z = J_2 d_2
 
     l1 = iwzv;
-    for (int i = 0; i < *n; i++) {
+    for (int i = 0; i < n; i++) {
         zv[i] = 0.;
     }
-    for (int j = *nact; j < *n; j++) {
-        for (int i = 0; i < *n; i++) {
-            zv[i] += dmat[i + j * dmat_dim1] * work[j];
+    for (int j = *nact; j < n; j++) {
+        for (int i = 0; i < n; i++) {
+            zv[i] += dmat[i + j * n] * work[j];
         }
     }
 
@@ -314,7 +307,7 @@ DONE_PARTIAL_STEP:
         }
         sum /= work[l1];
         rv[i] = sum;
-        if (iact[i] > *meq && sum > 0.) {
+        if (iact[i] > meq && sum > 0.) {
             t1inf = 0;
             it1 = i + 1;
         }
@@ -327,7 +320,7 @@ DONE_PARTIAL_STEP:
     if (!t1inf) {
         t1 = uv[it1 - 1] / rv[it1 - 1];
         for (int i = 0; i < *nact; i++) {
-            if (iact[i] > *meq && rv[i] > 0.) {
+            if (iact[i] > meq && rv[i] > 0.) {
                 temp = uv[i] / rv[i];
                 if (temp < t1) {
                     t1 = temp;
@@ -340,7 +333,7 @@ DONE_PARTIAL_STEP:
     // test if the z vector is equal to zero
 
     sum = 0.;
-    for (int i = 0; i < *n; i++) {
+    for (int i = 0; i < n; i++) {
         sum += zv[i] * zv[i];
     }
     if (abs(sum) <= vsmall) {
@@ -349,8 +342,7 @@ DONE_PARTIAL_STEP:
 
         if (t1inf) {
             // No step in dual space possible either, problem is not solvable
-            *ierr = 1;
-            return 0;
+            return 1;
         }
 
         // we take a partial step in dual space and drop constraint it1,
@@ -367,8 +359,8 @@ DONE_PARTIAL_STEP:
         // keep sum (which is z^Tn^+) to update crval below! */
 
         sum = 0.;
-        for (int i = 0; i < *n; i++) {
-            sum += zv[i] * amat[i + (nvl - 1) * amat_dim1];
+        for (int i = 0; i < n; i++) {
+            sum += zv[i] * amat[i + (nvl - 1) * n];
         }
         tt = -sv[nvl - 1] / sum;
         t2min = 1;
@@ -381,7 +373,7 @@ DONE_PARTIAL_STEP:
 
         // take step in primal and dual space
 
-        for (int i = 0; i < *n; i++) {
+        for (int i = 0; i < n; i++) {
             sol[i] += tt * zv[i];
         }
         *crval += tt * sum * (tt / 2. + uv[*nact]);
@@ -415,10 +407,10 @@ DONE_PARTIAL_STEP:
             // Givens transformations.
 
             l = iwrm + (*nact) * (*nact + 1) / 2;
-            if (*nact == *n) {
-                work[l - 1] = work[*n - 1];
+            if (*nact == n) {
+                work[l - 1] = work[n - 1];
             } else {
-                for (int i = *n - 1; i >= *nact; i--) {
+                for (int i = n - 1; i >= *nact; i--) {
                     // we have to find the Givens rotation which will reduce the element
                     // (l1) of d to zero.
                     // if it is already zero we don't have to do anything, except of
@@ -447,18 +439,18 @@ DONE_PARTIAL_STEP:
 
                         if (gc == 0.) {
                             work[i - 1] = gs * temp;
-                            for (int j = 0; j < *n; j++) {
-                                temp = dmat[j + (i - 1) * dmat_dim1];
-                                dmat[j + (i - 1) * dmat_dim1] = dmat[j + i * dmat_dim1];
-                                dmat[j + i * dmat_dim1] = temp;
+                            for (int j = 0; j < n; j++) {
+                                temp = dmat[j + (i - 1) * n];
+                                dmat[j + (i - 1) * n] = dmat[j + i * n];
+                                dmat[j + i * n] = temp;
                             }
                         } else if (gc != 1.) {
                             work[i - 1] = temp;
                             nu = gs / (gc + 1.);
-                            for (int j = 0; j < *n; j++) {
-                                temp = gc * dmat[j + (i - 1) * dmat_dim1] + gs * dmat[j + i * dmat_dim1];
-                                dmat[j + i * dmat_dim1] = nu * (dmat[j + (i - 1) * dmat_dim1] + temp) - dmat[j + i * dmat_dim1];
-                                dmat[j + (i - 1) * dmat_dim1] = temp;
+                            for (int j = 0; j < n; j++) {
+                                temp = gc * dmat[j + (i - 1) * n] + gs * dmat[j + i * n];
+                                dmat[j + i * n] = nu * (dmat[j + (i - 1) * n] + temp) - dmat[j + i * n];
+                                dmat[j + (i - 1) * n] = temp;
                             }
                         }
                     }
@@ -477,16 +469,16 @@ DONE_PARTIAL_STEP:
             // the fit violates the chosen constraint now.
 
             sum = -bvec[nvl-1];
-            for (int j = 0; j < *n; j++) {
-                sum += sol[j] * amat[j + (nvl-1) * amat_dim1];
+            for (int j = 0; j < n; j++) {
+                sum += sol[j] * amat[j + (nvl-1) * n];
             }
-            if (nvl > *meq) {
+            if (nvl > meq) {
                 sv[nvl - 1] = sum;
             } else {
                 sv[nvl - 1] = -abs(sum);
                 if (sum > 0.) {
-                    for (int j = 0; j < *n; j++) {
-                        amat[j + (nvl - 1) * amat_dim1] = -amat[j + (nvl - 1) * amat_dim1];
+                    for (int j = 0; j < n; j++) {
+                        amat[j + (nvl - 1) * n] = -amat[j + (nvl - 1) * n];
                     }
                     bvec[nvl - 1] = -bvec[nvl - 1];
                 }
@@ -536,10 +528,10 @@ DONE_PARTIAL_STEP:
                     work[l1-1] = temp;
                     l1 += i;
                 }
-                for (int i = 0; i < *n; i++) {
-                    temp = dmat[i + (it1-1) * dmat_dim1];
-                    dmat[i + (it1-1) * dmat_dim1] = dmat[i + (it1) * dmat_dim1];
-                    dmat[i + (it1) * dmat_dim1] = temp;
+                for (int i = 0; i < n; i++) {
+                    temp = dmat[i + (it1-1) * n];
+                    dmat[i + (it1-1) * n] = dmat[i + (it1) * n];
+                    dmat[i + (it1) * n] = temp;
                 }
             } else if (gc != 1.) {
                 nu = gs / (gc + 1.);
@@ -549,10 +541,10 @@ DONE_PARTIAL_STEP:
                     work[l1-1 - 1] = temp;
                     l1 += i;
                 }
-                for (int i = 0; i < *n; i++) {
-                    temp = gc * dmat[i + (it1-1) * dmat_dim1] + gs * dmat[i + (it1) * dmat_dim1];
-                    dmat[i + (it1) * dmat_dim1] = nu * (dmat[i + (it1-1) * dmat_dim1] + temp) - dmat[i + (it1) * dmat_dim1];
-                    dmat[i + (it1-1) * dmat_dim1] = temp;
+                for (int i = 0; i < n; i++) {
+                    temp = gc * dmat[i + (it1-1) * n] + gs * dmat[i + (it1) * n];
+                    dmat[i + (it1) * n] = nu * (dmat[i + (it1-1) * n] + temp) - dmat[i + (it1) * n];
+                    dmat[i + (it1-1) * n] = temp;
                 }
             }
         }

@@ -2,11 +2,11 @@ import numpy as np
 from libc.stdio cimport printf
 
 cdef extern nogil:
-    void qpgen2_(double* dmat, double* dvec,int* fddmat,int* n,
-                double* sol, double* lagr, double* crval,
-                double* amat, double* bvec, int* fdamat,
-                int* q, int* meq, int* iact, int* nact, int* iter,
-                double* work, int* ierr)
+    int qpgen2_(double *dmat, double *dvec, int n,
+                double *sol, double *lagr, double *crval,
+                double *amat, double *bvec, int q, int meq,
+                int* iact, int* nact, int* iter,
+                double* work, int ierr)
 
 
 def solve_qp(double[:, :] G, double[:] a, double[:, :] C=None, double[:] b=None, int meq=0, factorized=False):
@@ -67,8 +67,6 @@ def solve_qp(double[:, :] G, double[:] a, double[:, :] C=None, double[:] b=None,
         b = -np.ones(1)
         meq = 0
 
-    cdef int meq_ = meq
-
     n3, m1 = C.shape[0], C.shape[1]
     if n1 != n2:
         raise ValueError('G must be a square matrix. Receive shape=(%d,%d)' % (n1, n2))
@@ -86,24 +84,24 @@ def solve_qp(double[:, :] G, double[:] a, double[:, :] C=None, double[:] b=None,
     cdef double[::1] sol = np.zeros(n1)
     cdef double[::1] lagr = np.zeros(m1)
     cdef double crval = 0
+    cdef int meq_ = meq
     cdef int[::1] iact = np.zeros(m1, dtype=np.int32)
     cdef int nact = 0
-    cdef int ierr
     cdef int[::1] iters = np.zeros(2, dtype=np.int32)
     cdef double[::1] work = np.zeros(2*n1+min(n1, m1)*(min(n1, m1)+5)//2 + 2*m1 +1)
-    if factorized:
-        ierr = 1
-    else:
-        ierr = 0
+    cdef int factorized_ = 1 if factorized else 0
 
+    cdef int result
     with nogil:
-        qpgen2_(&G_[0,0], &a_[0], &n1, &n1, &sol[0], &lagr[0],
-                &crval, &C_[0, 0], &b_[0], &n1, &m1, &meq_, &iact[0],
-                &nact, &iters[0], &work[0], &ierr)
+        result = qpgen2_(&G_[0, 0], &a_[0], n1,
+                         &sol[0], &lagr[0], &crval,
+                         &C_[0, 0], &b_[0], m1, meq_,
+                         &iact[0], &nact, &iters[0],
+                         &work[0], factorized_)
 
-    if ierr == 1:
+    if result == 1:
         raise ValueError('constraints are inconsistent, no solution')
-    if ierr == 2:
+    if result == 2:
         raise ValueError('matrix G is not positive definite')
 
     return np.asarray(sol), crval, np.asarray(a_), np.asarray(iters), np.asarray(lagr), np.asarray(iact)[:nact]
