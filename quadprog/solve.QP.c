@@ -29,17 +29,16 @@
 /*  dmat   nxn matrix, the matrix D from above (dp) */
 /*         *** WILL BE DESTROYED ON EXIT *** */
 /*         The user has two possibilities: */
-/*         a) Give D (ierr=0), in this case we use routines from LINPACK */
+/*         a) Give D (factorized=0), in this case we use routines from LINPACK */
 /*            to decompose D. */
 /*         b) To get the algorithm started we need R^-1, where D=R^TR. */
 /*            So if it is cheaper to calculate R^-1 in another way (D may */
 /*            be a band matrix) then with the general routine, the user */
-/*            may pass R^{-1}.  Indicated by ierr not equal to zero. */
+/*            may pass R^{-1}.  Indicated by factorized not equal to zero. */
 /*  dvec   nx1 vector, the vector d from above (dp) */
 /*         *** WILL BE DESTROYED ON EXIT *** */
 /*         contains on exit the solution to the initial, i.e., */
 /*         unconstrained problem */
-/*  fddmat scalar, the leading dimension of the matrix dmat */
 /*  n      the dimension of dmat and dvec (int) */
 /*  amat   nxq matrix, the matrix A from above (dp) [ A=(A1 A2)^T ] */
 /*         *** ENTRIES CORRESPONDING TO EQUALITY CONSTRAINTS MAY HAVE */
@@ -48,13 +47,11 @@
 /*         [ b = (b1^T b2^T)^T ] */
 /*         *** ENTRIES CORRESPONDING TO EQUALITY CONSTRAINTS MAY HAVE */
 /*             CHANGED SIGNES ON EXIT *** */
-/*  fdamat the first dimension of amat as declared in the calling program. */
-/*         fdamat >= n !! */
 /*  q      integer, the number of constraints. */
 /*  meq    integer, the number of equality constraints, 0 <= meq <= q. */
-/*  ierr   integer, code for the status of the matrix D: */
-/*            ierr =  0, we have to decompose D */
-/*            ierr != 0, D is already decomposed into D=R^TR and we were */
+/*  factorized   integer, code for the status of the matrix D: */
+/*            factorized =  0, we have to decompose D */
+/*            factorized != 0, D is already decomposed into D=R^TR and we were */
 /*                       given R^{-1}. */
 
 /*  Output parameter: */
@@ -67,675 +64,481 @@
 /*  iter  2x1 vector, first component gives the number of "main" */
 /*        iterations, the second one says how many constraints were */
 /*        deleted after they became active */
-/*  ierr  integer, error code on exit, if */
-/*           ierr = 0, no problems */
-/*           ierr = 1, the minimization problem has no solution */
-/*           ierr = 2, problems with decomposing D, in this case sol */
-/*                     contains garbage!! */
+
+/*  Return value: */
+/*        0, no problems */
+/*        1, the minimization problem has no solution */
+/*        2, problems with decomposing D, in this case sol */
+/*           contains garbage!! */
 
 /*  Working space: */
 /*  work  vector with length at least 2*n+r*(r+5)/2 + 2*q +1 */
 /*        where r=min(n,q) */
 
-#define abs(x) ((x) >= 0 ? (x) : -(x))
-#define min(a,b) ((a) <= (b) ? (a) : (b))
-#define max(a,b) ((a) >= (b) ? (a) : (b))
+double fabs(double);
+double hypot(double, double);
+double sqrt(double);
 
-double d_sign(double *a, double *b) {
-	double x = (*a >= 0 ? *a : -*a);
-	return *b >= 0 ? x : -x;
+double dot(int n, double x[], double y[]);
+void triangular_solve(int n, double a[], double b[]);
+void triangular_solve_transpose(int n, double a[], double b[]);
+void triangular_invert(int n, double a[]);
+int cholesky(int n, double a[]);
+
+/*
+ * code gleaned from Powell's ZQPCVX routine to determine a small
+ * number that can be assumed to be an upper bound on the relative
+ * precision of the computer arithmetic.
+ */
+double calculate_vsmall() {
+    double vsmall = 1e-60;
+    do {
+        vsmall += vsmall;
+    } while ((vsmall * .1 + 1.) <= 1.0 || (vsmall * .2 + 1.) <= 1.0);
+    return vsmall;
 }
 
-/* Subroutine */ int qpgen2_(double *dmat, double *dvec, int *
-	fddmat, int *n, double *sol, double *lagr, double *
-	crval, double *amat, double *bvec, int *fdamat, int *
-	q, int *meq, int *iact, int *nact, int *iter,
-	double *work, int *ierr)
+int qpgen2_(double *dmat, double *dvec, int n,
+    double *sol, double *lagr, double *crval,
+    double *amat, double *bvec, int q, int meq,
+    int *iact, int *nact, int *iter,
+    double *work, int factorized)
 {
-    /* System generated locals */
-    int dmat_dim1, dmat_offset, amat_dim1, amat_offset, i__1, i__2;
-    double d__1, d__2, d__3, d__4;
-
-    /* Builtin functions */
-    double sqrt(double);
-
-    /* Local variables */
-    int i__, j, l, r__, l1;
-    double t1, gc, gs, nu, tt;
+    double t1, tt;
     int it1, nvl;
     double sum;
-    int info;
-    double tmpa, tmpb, temp;
-    int iwrm, iwrv, iwsv, iwuv, iwzv;
+    double temp;
     int t1inf, t2min;
-    int iwnbv;
-    double vsmall;
+    double vsmall = calculate_vsmall();
 
-    /* Parameter adjustments */
-    --dvec;
-    dmat_dim1 = *fddmat;
-    dmat_offset = 1 + dmat_dim1;
-    dmat -= dmat_offset;
-    --sol;
-    --lagr;
-    --bvec;
-    amat_dim1 = *fdamat;
-    amat_offset = 1 + amat_dim1;
-    amat -= amat_offset;
-    --iact;
-    --iter;
-    --work;
+    int* pIterMain = &iter[0];
+    int* pIterDeleted = &iter[1];
 
-    /* Function Body */
-    r__ = min(*n,*q);
-    l = (*n << 1) + r__ * (r__ + 5) / 2 + (*q << 1) + 1;
+    // calculate some constants, i.e., from which index on the different
+    // quantities are stored in the work matrix
 
-/*     code gleaned from Powell's ZQPCVX routine to determine a small */
-/*     number  that can be assumed to be an upper bound on the relative */
-/*     precision of the computer arithmetic. */
+    int r = n <= q ? n : q;
+    int iwzv = n;
+    int iwrv = iwzv + n;
+    int iwuv = iwrv + r;
+    int iwrm = iwuv + r + 1;
+    int iwsv = iwrm + r * (r + 1) / 2;
+    int iwnbv = iwsv + q;
+    double *zv = &work[iwzv];
+    double *rv = &work[iwrv];
+    double *uv = &work[iwuv];
+    double *rm = &work[iwrm];
+    double *sv = &work[iwsv];
+    double *nbv = &work[iwnbv];
 
-    vsmall = 1e-60;
-L1:
-    vsmall += vsmall;
-    tmpa = vsmall * .1 + 1.;
-    tmpb = vsmall * .2 + 1.;
-    if (tmpa <= 1.) {
-	goto L1;
-    }
-    if (tmpb <= 1.) {
-	goto L1;
+    for (int i = 0; i < iwnbv + q; i++) {
+        work[i] = 0.;
     }
 
-/* store the initial dvec to calculate below the unconstrained minima of */
-/* the critical value. */
-
-    i__1 = *n;
-    for (i__ = 1; i__ <= i__1; ++i__) {
-	work[i__] = dvec[i__];
-/* L10: */
-    }
-    i__1 = l;
-    for (i__ = *n + 1; i__ <= i__1; ++i__) {
-	work[i__] = 0.;
-/* L11: */
-    }
-    i__1 = *q;
-    for (i__ = 1; i__ <= i__1; ++i__) {
-	iact[i__] = 0;
-	lagr[i__] = 0.;
-/* L12: */
+    for (int i = 0; i < q; i++) {
+        iact[i] = 0;
+        lagr[i] = 0.;
     }
 
-/* get the initial solution */
+    // get the initial solution
 
-    if (*ierr == 0) {
-	info = cholesky(*n, &dmat[dmat_offset]);
-	if (info != 0) {
-	    *ierr = 2;
-	    goto L999;
-	}
-	triangular_solve_transpose(*n, &dmat[dmat_offset], &dvec[1]);
-	triangular_solve(*n, &dmat[dmat_offset], &dvec[1]);
-	triangular_invert(*n, &dmat[dmat_offset]);
+    for (int i = 0; i < n; i++) {
+        sol[i] = dvec[i];
+    }
+
+    if (!factorized) {
+        if (cholesky(n, dmat) != 0) {
+            return 2;
+        }
+        triangular_solve_transpose(n, dmat, sol);
+        triangular_solve(n, dmat, sol);
+        triangular_invert(n, dmat);
     } else {
+        // Matrix D is already factorized, so we have to multiply d first with
+        // R^-T and then with R^-1.  R^-1 is stored in the upper half of the
+        // array dmat.
 
-/* Matrix D is already factorized, so we have to multiply d first with */
-/* R^-T and then with R^-1.  R^-1 is stored in the upper half of the */
-/* array dmat. */
+        for (int j = n - 1; j >= 0; j--) {
+            sol[j] *= dmat[j + j * n];
+            for (int i = 0; i < j; i++) {
+                sol[j] += dmat[i + j * n] * sol[i];
+            }
+        }
 
-	i__1 = *n;
-	for (j = 1; j <= i__1; ++j) {
-	    sol[j] = 0.;
-	    i__2 = j;
-	    for (i__ = 1; i__ <= i__2; ++i__) {
-		sol[j] += dmat[i__ + j * dmat_dim1] * dvec[i__];
-/* L21: */
-	    }
-/* L20: */
-	}
-	i__1 = *n;
-	for (j = 1; j <= i__1; ++j) {
-	    dvec[j] = 0.;
-	    i__2 = *n;
-	    for (i__ = j; i__ <= i__2; ++i__) {
-		dvec[j] += dmat[j + i__ * dmat_dim1] * sol[i__];
-/* L23: */
-	    }
-/* L22: */
-	}
+        for (int j = 0; j < n; j++) {
+            sol[j] *= dmat[j + j * n];
+            for (int i = j + 1; i < n; i++) {
+                sol[j] += dmat[j + i * n] * sol[i];
+            }
+        }
     }
 
-/* set lower triangular of dmat to zero, store dvec in sol and */
-/* calculate value of the criterion at unconstrained minima */
+    // set lower triangular of dmat to zero
 
-    *crval = 0.;
-    i__1 = *n;
-    for (j = 1; j <= i__1; ++j) {
-	sol[j] = dvec[j];
-	*crval += work[j] * sol[j];
-	work[j] = 0.;
-	i__2 = *n;
-	for (i__ = j + 1; i__ <= i__2; ++i__) {
-	    dmat[i__ + j * dmat_dim1] = 0.;
-/* L32: */
-	}
-/* L30: */
+    for (int j = 0; j < n; j++) {
+        for (int i = j + 1; i < n; i++) {
+            dmat[i + j * n] = 0.;
+        }
     }
-    *crval = -(*crval) / 2.;
-    *ierr = 0;
 
-/* calculate some constants, i.e., from which index on the different */
-/* quantities are stored in the work matrix */
+    // calculate value of the criterion at unconstrained minima
 
-    iwzv = *n;
-    iwrv = iwzv + *n;
-    iwuv = iwrv + r__;
-    iwrm = iwuv + r__ + 1;
-    iwsv = iwrm + r__ * (r__ + 1) / 2;
-    iwnbv = iwsv + *q;
+    *crval = -dot(n, dvec, sol) / 2.;
 
-/* calculate the norm of each column of the A matrix */
+    // now we can return the unconstrained minimum in dvec
 
-    i__1 = *q;
-    for (i__ = 1; i__ <= i__1; ++i__) {
-	sum = 0.;
-	i__2 = *n;
-	for (j = 1; j <= i__2; ++j) {
-	    sum += amat[j + i__ * amat_dim1] * amat[j + i__ * amat_dim1];
-/* L52: */
-	}
-	work[iwnbv + i__] = sqrt(sum);
-/* L51: */
+    for (int i = 0; i < n; i++) {
+        dvec[i] = sol[i];
     }
+
+    // calculate the norm of each column of the A matrix
+
+    for (int i = 0; i < q; i++) {
+        nbv[i] = sqrt(dot(n, &amat[i * n], &amat[i * n]));
+    }
+
     *nact = 0;
-    iter[1] = 0;
-    iter[2] = 0;
-L50:
+    *pIterMain = 0;
+    *pIterDeleted = 0;
 
-/* start a new iteration */
+DONE_FULL_STEP:
 
-    ++iter[1];
+    // start a new iteration
 
-/* calculate all constraints and check which are still violated */
-/* for the equality constraints we have to check whether the normal */
-/* vector has to be negated (as well as bvec in that case) */
+    ++*pIterMain;
 
-    l = iwsv;
-    i__1 = *q;
-    for (i__ = 1; i__ <= i__1; ++i__) {
-	++l;
-	sum = -bvec[i__];
-	i__2 = *n;
-	for (j = 1; j <= i__2; ++j) {
-	    sum += amat[j + i__ * amat_dim1] * sol[j];
-/* L61: */
-	}
-	if (abs(sum) < vsmall) {
-	    sum = 0.;
-	}
-	if (i__ > *meq) {
-	    work[l] = sum;
-	} else {
-	    work[l] = -abs(sum);
-	    if (sum > 0.) {
-		i__2 = *n;
-		for (j = 1; j <= i__2; ++j) {
-		    amat[j + i__ * amat_dim1] = -amat[j + i__ * amat_dim1];
-/* L62: */
-		}
-		bvec[i__] = -bvec[i__];
-	    }
-	}
-/* L60: */
+    // calculate all constraints and check which are still violated
+    // for the equality constraints we have to check whether the normal
+    // vector has to be negated (as well as bvec in that case)
+
+    for (int i = 0; i < q; i++) {
+        sum = -bvec[i];
+        for (int j = 0; j < n; j++) {
+            sum += amat[j + i * n] * sol[j];
+        }
+        if (fabs(sum) < vsmall) {
+            sum = 0.;
+        }
+        if (i >= meq) {
+            sv[i] = sum;
+        } else {
+            sv[i] = -fabs(sum);
+            if (sum > 0.) {
+                for (int j = 0; j < n; j++) {
+                    amat[j + i * n] = -amat[j + i * n];
+                }
+                bvec[i] = -bvec[i];
+            }
+        }
     }
 
-/* as safeguard against rounding errors set already active constraints */
-/* explicitly to zero */
+    // as safeguard against rounding errors set already active constraints
+    // explicitly to zero
 
-    i__1 = *nact;
-    for (i__ = 1; i__ <= i__1; ++i__) {
-	work[iwsv + iact[i__]] = 0.;
-/* L70: */
+    for (int i = 0; i < *nact; i++) {
+        sv[iact[i] - 1] = 0.;
     }
 
-/* we weight each violation by the number of non-zero elements in the */
-/* corresponding row of A. then we choose the violated constraint which */
-/* has maximal absolute value, i.e., the minimum. */
-/* by obvious commenting and uncommenting we can choose the strategy to */
-/* take always the first constraint which is violated. ;-) */
+    // we weight each violation by the number of non-zero elements in the
+    // corresponding row of A. then we choose the violated constraint which
+    // has maximal absolute value, i.e., the minimum.
 
     nvl = 0;
     temp = 0.;
-    i__1 = *q;
-    for (i__ = 1; i__ <= i__1; ++i__) {
-	if (work[iwsv + i__] < temp * work[iwnbv + i__]) {
-	    nvl = i__;
-	    temp = work[iwsv + i__] / work[iwnbv + i__];
-	}
-/*         if (work(iwsv+i) .LT. 0.d0) then */
-/*            nvl = i */
-/*            goto 72 */
-/*         endif */
-/* L71: */
+    for (int i = 0; i < q; i++) {
+        if (sv[i] < temp * nbv[i]) {
+            nvl = i + 1;
+            temp = sv[i] / nbv[i];
+        }
     }
-/* L72: */
     if (nvl == 0) {
-	i__1 = *nact;
-	for (i__ = 1; i__ <= i__1; ++i__) {
-	    lagr[iact[i__]] = work[iwuv + i__];
-/* L73: */
-	}
-	goto L999;
+        for (int i = 0; i < *nact; i++) {
+            lagr[iact[i] - 1] = uv[i];
+        }
+        return 0;
     }
 
-/* calculate d=J^Tn^+ where n^+ is the normal vector of the violated */
-/* constraint. J is stored in dmat in this implementation!! */
-/* if we drop a constraint, we have to jump back here. */
+DONE_PARTIAL_STEP:
 
-L55:
-    i__1 = *n;
-    for (i__ = 1; i__ <= i__1; ++i__) {
-	sum = 0.;
-	i__2 = *n;
-	for (j = 1; j <= i__2; ++j) {
-	    sum += dmat[j + i__ * dmat_dim1] * amat[j + nvl * amat_dim1];
-/* L81: */
-	}
-	work[i__] = sum;
-/* L80: */
+    // calculate d=J^Tn^+ where n^+ is the normal vector of the violated
+    // constraint. J is stored in dmat in this implementation!!
+    // if we drop a constraint, we have to jump back here.
+
+    for (int i = 0; i < n; i++) {
+        sum = 0.;
+        for (int j = 0; j < n; j++) {
+            sum += dmat[j + i * n] * amat[j + (nvl - 1) * n];
+        }
+        work[i] = sum;
     }
 
-/* Now calculate z = J_2 d_2 */
+    // Now calculate z = J_2 d_2
 
-    l1 = iwzv;
-    i__1 = *n;
-    for (i__ = 1; i__ <= i__1; ++i__) {
-	work[l1 + i__] = 0.;
-/* L90: */
+    for (int i = 0; i < n; i++) {
+        zv[i] = 0.;
     }
-    i__1 = *n;
-    for (j = *nact + 1; j <= i__1; ++j) {
-	i__2 = *n;
-	for (i__ = 1; i__ <= i__2; ++i__) {
-	    work[l1 + i__] += dmat[i__ + j * dmat_dim1] * work[j];
-/* L93: */
-	}
-/* L92: */
+    for (int j = *nact; j < n; j++) {
+        for (int i = 0; i < n; i++) {
+            zv[i] += dmat[i + j * n] * work[j];
+        }
     }
 
-/* and r = R^{-1} d_1, check also if r has positive elements (among the */
-/* entries corresponding to inequalities constraints). */
+    // and r = R^{-1} d_1, check also if r has positive elements (among the
+    // entries corresponding to inequalities constraints).
+
+    for (int i = *nact - 1; i >= 0; i--) {
+        sum = work[i];
+        int rm_offset = (i + 1) * (i + 2) / 2 - 1;
+        int k = 0;
+        for (int j = i + 1; j <= *nact; j++) {
+            sum -= rm[rm_offset + i + 1 + k] * rv[j];
+            k += j + 1;
+        }
+        rv[i] = sum / rm[rm_offset];
+    }
+
+    // if r has positive elements, find the partial step length t1, which is
+    // the maximum step in dual space without violating dual feasibility.
+    // it1  stores in which component t1, the min of u/r, occurs.
 
     t1inf = 1;
-    for (i__ = *nact; i__ >= 1; --i__) {
-	sum = work[i__];
-	l = iwrm + i__ * (i__ + 3) / 2;
-	l1 = l - i__;
-	i__1 = *nact;
-	for (j = i__ + 1; j <= i__1; ++j) {
-	    sum -= work[l] * work[iwrv + j];
-	    l += j;
-/* L96: */
-	}
-	sum /= work[l1];
-	work[iwrv + i__] = sum;
-	if (iact[i__] <= *meq) {
-	    goto L95;
-	}
-	if (sum <= 0.) {
-	    goto L95;
-	}
-/* L7: */
-	t1inf = 0;
-	it1 = i__;
-L95:
-	;
+    for (int i = 0; i < *nact; i++) {
+        if (iact[i] > meq && rv[i] > 0.) {
+            double current = uv[i] / rv[i];
+            if (t1inf) {
+                t1inf = 0;
+                t1 = current;
+                it1 = i + 1;
+            } else if (current < t1) {
+                it1 = i + 1;
+            }
+        }
     }
 
-/* if r has positive elements, find the partial step length t1, which is */
-/* the maximum step in dual space without violating dual feasibility. */
-/* it1  stores in which component t1, the min of u/r, occurs. */
-
-    if (! t1inf) {
-	t1 = work[iwuv + it1] / work[iwrv + it1];
-	i__1 = *nact;
-	for (i__ = 1; i__ <= i__1; ++i__) {
-	    if (iact[i__] <= *meq) {
-		goto L100;
-	    }
-	    if (work[iwrv + i__] <= 0.) {
-		goto L100;
-	    }
-	    temp = work[iwuv + i__] / work[iwrv + i__];
-	    if (temp < t1) {
-		t1 = temp;
-		it1 = i__;
-	    }
-L100:
-	    ;
-	}
-    }
-
-/* test if the z vector is equal to zero */
+    // test if the z vector is equal to zero
 
     sum = 0.;
-    i__1 = iwzv + *n;
-    for (i__ = iwzv + 1; i__ <= i__1; ++i__) {
-	sum += work[i__] * work[i__];
-/* L110: */
+    for (int i = 0; i < n; i++) {
+        sum += zv[i] * zv[i];
     }
-    if (abs(sum) <= vsmall) {
+    if (fabs(sum) <= vsmall) {
+        // No step in primal space such that the new constraint becomes
+        // feasible. Take step in dual space and drop a constant.
 
-/* No step in primal space such that the new constraint becomes */
-/* feasible. Take step in dual space and drop a constant. */
+        if (t1inf) {
+            // No step in dual space possible either, problem is not solvable
+            return 1;
+        }
 
-	if (t1inf) {
+        // we take a partial step in dual space and drop constraint it1,
+        // that is, we drop the it1-th active constraint.
+        // then we continue at step 2(a) (marked by label 55)
 
-/* No step in dual space possible either, problem is not solvable */
-
-	    *ierr = 1;
-	    goto L999;
-	} else {
-
-/* we take a partial step in dual space and drop constraint it1, */
-/* that is, we drop the it1-th active constraint. */
-/* then we continue at step 2(a) (marked by label 55) */
-
-	    i__1 = *nact;
-	    for (i__ = 1; i__ <= i__1; ++i__) {
-		work[iwuv + i__] -= t1 * work[iwrv + i__];
-/* L111: */
-	    }
-	    work[iwuv + *nact + 1] += t1;
-	    goto L700;
-	}
+        for (int i = 0; i < *nact; i++) {
+            uv[i] -= t1 * rv[i];
+        }
+        uv[*nact] += t1;
     } else {
+        // compute full step length t2, minimum step in primal space such that */
+        // the constraint becomes feasible. */
+        // keep sum (which is z^Tn^+) to update crval below! */
 
-/* compute full step length t2, minimum step in primal space such that */
-/* the constraint becomes feasible. */
-/* keep sum (which is z^Tn^+) to update crval below! */
+        sum = 0.;
+        for (int i = 0; i < n; i++) {
+            sum += zv[i] * amat[i + (nvl - 1) * n];
+        }
+        tt = -sv[nvl - 1] / sum;
+        t2min = 1;
+        if (!t1inf && t1 < tt) {
+            tt = t1;
+            t2min = 0;
+        }
 
-	sum = 0.;
-	i__1 = *n;
-	for (i__ = 1; i__ <= i__1; ++i__) {
-	    sum += work[iwzv + i__] * amat[i__ + nvl * amat_dim1];
-/* L120: */
-	}
-	tt = -work[iwsv + nvl] / sum;
-	t2min = 1;
-	if (! t1inf) {
-	    if (t1 < tt) {
-		tt = t1;
-		t2min = 0;
-	    }
-	}
+        // take step in primal and dual space
 
-/* take step in primal and dual space */
+        for (int i = 0; i < n; i++) {
+            sol[i] += tt * zv[i];
+        }
+        *crval += tt * sum * (tt / 2. + uv[*nact]);
+        for (int i = 0; i < *nact; i++) {
+            uv[i] -= tt * rv[i];
+        }
+        uv[*nact] += tt;
 
-	i__1 = *n;
-	for (i__ = 1; i__ <= i__1; ++i__) {
-	    sol[i__] += tt * work[iwzv + i__];
-/* L130: */
-	}
-	*crval += tt * sum * (tt / 2. + work[iwuv + *nact + 1]);
-	i__1 = *nact;
-	for (i__ = 1; i__ <= i__1; ++i__) {
-	    work[iwuv + i__] -= tt * work[iwrv + i__];
-/* L131: */
-	}
-	work[iwuv + *nact + 1] += tt;
+        // if it was a full step, then we check wheter further constraints are
+        // violated otherwise we can drop the current constraint and iterate once
+        // more
+        if (t2min) {
+            // we took a full step. Thus add constraint nvl to the list of active
+            // constraints and update J and R
 
-/* if it was a full step, then we check wheter further constraints are */
-/* violated otherwise we can drop the current constraint and iterate once */
-/* more */
-	if (t2min) {
+            ++(*nact);
+            iact[*nact - 1] = nvl;
 
-/* we took a full step. Thus add constraint nvl to the list of active */
-/* constraints and update J and R */
+            // to update R we have to put the first nact-1 components of the d vector
+            // into column (nact) of R
 
-	    ++(*nact);
-	    iact[*nact] = nvl;
+            for (int i = 0; i < *nact - 1; i++) {
+                rm[(*nact - 1) * *nact / 2 + i] = work[i];
+            }
 
-/* to update R we have to put the first nact-1 components of the d vector */
-/* into column (nact) of R */
+            // if now nact=n, then we just have to add the last element to the new
+            // row of R.
+            // Otherwise we use Givens transformations to turn the vector d(nact:n)
+            // into a multiple of the first unit vector. That multiple goes into the
+            // last element of the new row of R and J is accordingly updated by the
+            // Givens transformations.
 
-	    l = iwrm + (*nact - 1) * *nact / 2 + 1;
-	    i__1 = *nact - 1;
-	    for (i__ = 1; i__ <= i__1; ++i__) {
-		work[l] = work[i__];
-		++l;
-/* L150: */
-	    }
+            for (int i = n - 1; i >= *nact; i--) {
+                // we have to find the Givens rotation which will reduce the element
+                // (l1) of d to zero.
+                // if it is already zero we don't have to do anything, except of
+                // decreasing l1
 
-/* if now nact=n, then we just have to add the last element to the new */
-/* row of R. */
-/* Otherwise we use Givens transformations to turn the vector d(nact:n) */
-/* into a multiple of the first unit vector. That multiple goes into the */
-/* last element of the new row of R and J is accordingly updated by the */
-/* Givens transformations. */
+                if (work[i] != 0. && work[i - 1] == 0.) {
+                    work[i - 1] = work[i];
+                    for (int j = 0; j < n; j++) {
+                        temp = dmat[j + (i - 1) * n];
+                        dmat[j + (i - 1) * n] = dmat[j + i * n];
+                        dmat[j + i * n] = temp;
+                    }
+                } else if (work[i] != 0.) {
+                    double h = hypot(work[i - 1], work[i]);
 
-	    if (*nact == *n) {
-		work[l] = work[*n];
-	    } else {
-		i__1 = *nact + 1;
-		for (i__ = *n; i__ >= i__1; --i__) {
+                    if (work[i - 1] < 0.0) {
+                        h = -h;
+                    }
 
-/* we have to find the Givens rotation which will reduce the element */
-/* (l1) of d to zero. */
-/* if it is already zero we don't have to do anything, except of */
-/* decreasing l1 */
+                    double gc = work[i - 1] / h;
+                    double gs = work[i] / h;
+                    double nu = work[i] / (work[i - 1] + h);
 
-		    if (work[i__] == 0.) {
-			goto L160;
-		    }
-/* Computing MAX */
-		    d__3 = (d__1 = work[i__ - 1], abs(d__1)), d__4 = (d__2 = 
-			    work[i__], abs(d__2));
-		    gc = max(d__3,d__4);
-/* Computing MIN */
-		    d__3 = (d__1 = work[i__ - 1], abs(d__1)), d__4 = (d__2 = 
-			    work[i__], abs(d__2));
-		    gs = min(d__3,d__4);
-		    d__1 = gc * sqrt((gs / gc) * (gs / gc) + 1);
-		    temp = d_sign(&d__1, &work[i__ - 1]);
-		    gc = work[i__ - 1] / temp;
-		    gs = work[i__] / temp;
+                    // The Givens rotation is done with the matrix (gc gs, gs -gc).
+                    // If gc is one, then element (i) of d is zero compared with element
+                    // (l1-1). Hence we don't have to do anything.
+                    // If gc is zero, then we just have to switch column (i) and column (i-1)
+                    // of J. Since we only switch columns in J, we have to be careful how we
+                    // update d depending on the sign of gs.
+                    // Otherwise we have to apply the Givens rotation to these columns.
+                    // The i-1 element of d has to be updated to temp.
 
-/* The Givens rotation is done with the matrix (gc gs, gs -gc). */
-/* If gc is one, then element (i) of d is zero compared with element */
-/* (l1-1). Hence we don't have to do anything. */
-/* If gc is zero, then we just have to switch column (i) and column (i-1) */
-/* of J. Since we only switch columns in J, we have to be careful how we */
-/* update d depending on the sign of gs. */
-/* Otherwise we have to apply the Givens rotation to these columns. */
-/* The i-1 element of d has to be updated to temp. */
+                    work[i - 1] = h;
+                    for (int j = 0; j < n; j++) {
+                        temp = gc * dmat[j + (i - 1) * n] + gs * dmat[j + i * n];
+                        dmat[j + i * n] = nu * (dmat[j + (i - 1) * n] + temp) - dmat[j + i * n];
+                        dmat[j + (i - 1) * n] = temp;
+                    }
+                }
+            }
 
-		    if (gc == 1.) {
-			goto L160;
-		    }
-		    if (gc == 0.) {
-			work[i__ - 1] = gs * temp;
-			i__2 = *n;
-			for (j = 1; j <= i__2; ++j) {
-			    temp = dmat[j + (i__ - 1) * dmat_dim1];
-			    dmat[j + (i__ - 1) * dmat_dim1] = dmat[j + i__ * 
-				    dmat_dim1];
-			    dmat[j + i__ * dmat_dim1] = temp;
-/* L170: */
-			}
-		    } else {
-			work[i__ - 1] = temp;
-			nu = gs / (gc + 1.);
-			i__2 = *n;
-			for (j = 1; j <= i__2; ++j) {
-			    temp = gc * dmat[j + (i__ - 1) * dmat_dim1] + gs *
-				     dmat[j + i__ * dmat_dim1];
-			    dmat[j + i__ * dmat_dim1] = nu * (dmat[j + (i__ - 
-				    1) * dmat_dim1] + temp) - dmat[j + i__ * 
-				    dmat_dim1];
-			    dmat[j + (i__ - 1) * dmat_dim1] = temp;
-/* L180: */
-			}
-		    }
-L160:
-		    ;
-		}
+            // So store d(nact) in R(nact,nact)
+            rm[(*nact) * (*nact + 1) / 2 - 1] = work[*nact - 1];
 
-/* l is still pointing to element (nact,nact) of the matrix R. */
-/* So store d(nact) in R(nact,nact) */
-		work[l] = work[*nact];
-	    }
-	} else {
+            goto DONE_FULL_STEP;
+        } else {
+            // we took a partial step in dual space. Thus drop constraint it1,
+            // that is, we drop the it1-th active constraint.
+            // then we continue at step 2(a) (marked by label 55)
+            // but since the fit changed, we have to recalculate now "how much"
+            // the fit violates the chosen constraint now.
 
-/* we took a partial step in dual space. Thus drop constraint it1, */
-/* that is, we drop the it1-th active constraint. */
-/* then we continue at step 2(a) (marked by label 55) */
-/* but since the fit changed, we have to recalculate now "how much" */
-/* the fit violates the chosen constraint now. */
-
-	    sum = -bvec[nvl];
-	    i__1 = *n;
-	    for (j = 1; j <= i__1; ++j) {
-		sum += sol[j] * amat[j + nvl * amat_dim1];
-/* L190: */
-	    }
-	    if (nvl > *meq) {
-		work[iwsv + nvl] = sum;
-	    } else {
-		work[iwsv + nvl] = -abs(sum);
-		if (sum > 0.) {
-		    i__1 = *n;
-		    for (j = 1; j <= i__1; ++j) {
-			amat[j + nvl * amat_dim1] = -amat[j + nvl * amat_dim1]
-				;
-/* L191: */
-		    }
-		    bvec[nvl] = -bvec[nvl];
-		}
-	    }
-	    goto L700;
-	}
-    }
-    goto L50;
-
-/* Drop constraint it1 */
-
-L700:
-
-/* if it1 = nact it is only necessary to update the vector u and nact */
-
-    if (it1 == *nact) {
-	goto L799;
+            sum = -bvec[nvl-1];
+            for (int j = 0; j < n; j++) {
+                sum += sol[j] * amat[j + (nvl-1) * n];
+            }
+            if (nvl > meq) {
+                sv[nvl - 1] = sum;
+            } else {
+                sv[nvl - 1] = -fabs(sum);
+                if (sum > 0.) {
+                    for (int j = 0; j < n; j++) {
+                        amat[j + (nvl - 1) * n] = -amat[j + (nvl - 1) * n];
+                    }
+                    bvec[nvl - 1] = -bvec[nvl - 1];
+                }
+            }
+        }
     }
 
-/* After updating one row of R (column of J) we will also come back here */
+    // Drop constraint it1
 
-L797:
+    // if it1 = nact it is only necessary to update the vector u and nact
+    for (; it1 < *nact; it1++) {
+        // After updating one row of R (column of J) we will also come back here
 
-/* we have to find the Givens rotation which will reduce the element */
-/* (it1+1,it1+1) of R to zero. */
-/* if it is already zero we don't have to do anything except of updating */
-/* u, iact, and shifting column (it1+1) of R to column (it1) */
-/* l  will point to element (1,it1+1) of R */
-/* l1 will point to element (it1+1,it1+1) of R */
+        // we have to find the Givens rotation which will reduce the element
+        // (it1+1,it1+1) of R to zero.
+        // if it is already zero we don't have to do anything except of updating
+        // u, iact, and shifting column (it1+1) of R to column (it1)
+        // l  will point to element (1,it1+1) of R
+        // l1 will point to element (it1+1,it1+1) of R
 
-    l = iwrm + it1 * (it1 + 1) / 2 + 1;
-    l1 = l + it1;
-    if (work[l1] == 0.) {
-	goto L798;
-    }
-/* Computing MAX */
-    d__3 = (d__1 = work[l1 - 1], abs(d__1)), d__4 = (d__2 = work[l1], abs(
-	    d__2));
-    gc = max(d__3,d__4);
-/* Computing MIN */
-    d__3 = (d__1 = work[l1 - 1], abs(d__1)), d__4 = (d__2 = work[l1], abs(
-	    d__2));
-    gs = min(d__3,d__4);
-    d__1 = gc * sqrt((gs / gc) * (gs / gc) + 1);
-    temp = d_sign(&d__1, &work[l1 - 1]);
-    gc = work[l1 - 1] / temp;
-    gs = work[l1] / temp;
+        int l = it1 * (it1 + 1) / 2;
+        int l1 = l + it1;
+        if (rm[l1] != 0. && rm[l1 - 1] == 0.) {
+            for (int i = it1 + 1; i <= *nact; i++) {
+                temp = rm[l1 - 1];
+                rm[l1 - 1] = rm[l1];
+                rm[l1] = temp;
+                l1 += i;
+            }
+            for (int i = 0; i < n; i++) {
+                temp = dmat[i + (it1-1) * n];
+                dmat[i + (it1 - 1) * n] = dmat[i + (it1) * n];
+                dmat[i + (it1) * n] = temp;
+            }
+        } else if (rm[l1] != 0.) {
+            double h = hypot(rm[l1 - 1], rm[l1]);
 
-/* The Givens rotatin is done with the matrix (gc gs, gs -gc). */
-/* If gc is one, then element (it1+1,it1+1) of R is zero compared with */
-/* element (it1,it1+1). Hence we don't have to do anything. */
-/* if gc is zero, then we just have to switch row (it1) and row (it1+1) */
-/* of R and column (it1) and column (it1+1) of J. Since we swithc rows in */
-/* R and columns in J, we can ignore the sign of gs. */
-/* Otherwise we have to apply the Givens rotation to these rows/columns. */
+            if (rm[l1 - 1] < 0.0) {
+                h = -h;
+            }
 
-    if (gc == 1.) {
-	goto L798;
-    }
-    if (gc == 0.) {
-	i__1 = *nact;
-	for (i__ = it1 + 1; i__ <= i__1; ++i__) {
-	    temp = work[l1 - 1];
-	    work[l1 - 1] = work[l1];
-	    work[l1] = temp;
-	    l1 += i__;
-/* L710: */
-	}
-	i__1 = *n;
-	for (i__ = 1; i__ <= i__1; ++i__) {
-	    temp = dmat[i__ + it1 * dmat_dim1];
-	    dmat[i__ + it1 * dmat_dim1] = dmat[i__ + (it1 + 1) * dmat_dim1];
-	    dmat[i__ + (it1 + 1) * dmat_dim1] = temp;
-/* L711: */
-	}
-    } else {
-	nu = gs / (gc + 1.);
-	i__1 = *nact;
-	for (i__ = it1 + 1; i__ <= i__1; ++i__) {
-	    temp = gc * work[l1 - 1] + gs * work[l1];
-	    work[l1] = nu * (work[l1 - 1] + temp) - work[l1];
-	    work[l1 - 1] = temp;
-	    l1 += i__;
-/* L720: */
-	}
-	i__1 = *n;
-	for (i__ = 1; i__ <= i__1; ++i__) {
-	    temp = gc * dmat[i__ + it1 * dmat_dim1] + gs * dmat[i__ + (it1 + 
-		    1) * dmat_dim1];
-	    dmat[i__ + (it1 + 1) * dmat_dim1] = nu * (dmat[i__ + it1 * 
-		    dmat_dim1] + temp) - dmat[i__ + (it1 + 1) * dmat_dim1];
-	    dmat[i__ + it1 * dmat_dim1] = temp;
-/* L721: */
-	}
+            double gc = rm[l1 - 1] / h;
+            double gs = rm[l1] / h;
+            double nu = rm[l1] / (rm[l1 - 1] + h);
+
+            // The Givens rotatin is done with the matrix (gc gs, gs -gc).
+            // If gc is one, then element (it1+1,it1+1) of R is zero compared with
+            // element (it1,it1+1). Hence we don't have to do anything.
+            // if gc is zero, then we just have to switch row (it1) and row (it1+1)
+            // of R and column (it1) and column (it1+1) of J. Since we swithc rows in
+            // R and columns in J, we can ignore the sign of gs.
+            // Otherwise we have to apply the Givens rotation to these rows/columns.
+
+            for (int i = it1 + 1; i <= *nact; i++) {
+                temp = gc * rm[l1 - 1] + gs * rm[l1];
+                rm[l1] = nu * (rm[l1 - 1] + temp) - rm[l1];
+                rm[l1 - 1] = temp;
+                l1 += i;
+            }
+            for (int i = 0; i < n; i++) {
+                temp = gc * dmat[i + (it1-1) * n] + gs * dmat[i + (it1) * n];
+                dmat[i + (it1) * n] = nu * (dmat[i + (it1-1) * n] + temp) - dmat[i + (it1) * n];
+                dmat[i + (it1-1) * n] = temp;
+            }
+        }
+
+        // shift column (it1+1) of R to column (it1) (that is, the first it1
+        // elements). The posit1on of element (1,it1+1) of R was calculated above
+        // and stored in l.
+
+        for (int i = 0; i < it1; i++) {
+            rm[l + i - it1] = rm[l + i];
+        }
+
+        // update vector u and iact as necessary
+        // Continue with updating the matrices J and R
+
+        uv[it1-1] = uv[it1];
+        iact[it1-1] = iact[it1];
     }
 
-/* shift column (it1+1) of R to column (it1) (that is, the first it1 */
-/* elements). The posit1on of element (1,it1+1) of R was calculated above */
-/* and stored in l. */
-
-L798:
-    l1 = l - it1;
-    i__1 = it1;
-    for (i__ = 1; i__ <= i__1; ++i__) {
-	work[l1] = work[l];
-	++l;
-	++l1;
-/* L730: */
-    }
-
-/* update vector u and iact as necessary */
-/* Continue with updating the matrices J and R */
-
-    work[iwuv + it1] = work[iwuv + it1 + 1];
-    iact[it1] = iact[it1 + 1];
-    ++it1;
-    if (it1 < *nact) {
-	goto L797;
-    }
-L799:
-    work[iwuv + *nact] = work[iwuv + *nact + 1];
-    work[iwuv + *nact + 1] = 0.;
-    iact[*nact] = 0;
+    uv[*nact-1] = uv[*nact];
+    uv[*nact] = 0.;
+    iact[*nact-1] = 0;
     --(*nact);
-    ++iter[2];
-    goto L55;
-L999:
-    return 0;
-} /* qpgen2_ */
+    ++(*pIterDeleted);
 
+    goto DONE_PARTIAL_STEP;
+}

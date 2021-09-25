@@ -46,7 +46,7 @@ def verify(G, a, C=None, b=None):
     assert np.all(lagr >= 0)
 
     # verify complementary slackness
-    assert not np.any((lagr > 0) & (slack > 0))
+    assert not np.any((lagr > 0) & (slack > 1e-15))
 
     # verify first-order optimality condition
     np.testing.assert_array_almost_equal(G.dot(xf) - a, C.dot(lagr))
