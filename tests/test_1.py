@@ -26,9 +26,30 @@ def solve_qp_scipy(G, a, C, b, meq=0):
 
 def verify(G, a, C=None, b=None):
     xf, f, xu, iters, lagr, iact = solve_qp(G, a, C, b)
+
+    # compare the constrained solution and objective against scipy
     result = solve_qp_scipy(G, a, C, b)
     np.testing.assert_array_almost_equal(result.x, xf)
     np.testing.assert_array_almost_equal(result.fun, f)
+
+    # verify the unconstrained solution
+    np.testing.assert_array_almost_equal(G.dot(xu), a)
+
+    if C is None:
+        return
+
+    # verify primal feasibility
+    slack = xf.dot(C) - b
+    assert np.all(slack > -1e-15)
+
+    # verify dual feasibility
+    assert np.all(lagr >= 0)
+
+    # verify complementary slackness
+    assert not np.any((lagr > 0) & (slack > 0))
+
+    # verify first-order optimality condition
+    np.testing.assert_array_almost_equal(G.dot(xf) - a, C.dot(lagr))
 
 
 def test_1():
