@@ -79,6 +79,7 @@ double fabs(double);
 double hypot(double, double);
 double sqrt(double);
 
+double dot(int n, double x[], double y[]);
 void triangular_solve(int n, double a[], double b[]);
 void triangular_solve_transpose(int n, double a[], double b[]);
 void triangular_invert(int n, double a[]);
@@ -130,15 +131,10 @@ int qpgen2_(double *dmat, double *dvec, int n,
     double *sv = &work[iwsv];
     double *nbv = &work[iwnbv];
 
-    // store the initial dvec to calculate below the unconstrained minima of
-    // the critical value.
-
-    for (int i = 0; i < n; i++) {
-        work[i] = dvec[i];
-    }
-    for (int i = n; i < iwnbv + q; i++) {
+    for (int i = 0; i < iwnbv + q; i++) {
         work[i] = 0.;
     }
+
     for (int i = 0; i < q; i++) {
         iact[i] = 0;
         lagr[i] = 0.;
@@ -146,55 +142,59 @@ int qpgen2_(double *dmat, double *dvec, int n,
 
     // get the initial solution
 
+    for (int i = 0; i < n; i++) {
+        sol[i] = dvec[i];
+    }
+
     if (!factorized) {
         if (cholesky(n, dmat) != 0) {
             return 2;
         }
-        triangular_solve_transpose(n, dmat, dvec);
-        triangular_solve(n, dmat, dvec);
+        triangular_solve_transpose(n, dmat, sol);
+        triangular_solve(n, dmat, sol);
         triangular_invert(n, dmat);
     } else {
         // Matrix D is already factorized, so we have to multiply d first with
         // R^-T and then with R^-1.  R^-1 is stored in the upper half of the
         // array dmat.
 
-        for (int j = 0; j < n; j++) {
-            sol[j] = 0.;
-            for (int i = 0; i <= j; i++) {
-                sol[j] += dmat[i + j * n] * dvec[i];
+        for (int j = n - 1; j >= 0; j--) {
+            sol[j] *= dmat[j + j * n];
+            for (int i = 0; i < j; i++) {
+                sol[j] += dmat[i + j * n] * sol[i];
             }
         }
 
         for (int j = 0; j < n; j++) {
-            dvec[j] = 0.;
-            for (int i = j; i < n; i++) {
-                dvec[j] += dmat[j + i * n] * sol[i];
+            sol[j] *= dmat[j + j * n];
+            for (int i = j + 1; i < n; i++) {
+                sol[j] += dmat[j + i * n] * sol[i];
             }
         }
     }
 
-    // set lower triangular of dmat to zero, store dvec in sol and
-    // calculate value of the criterion at unconstrained minima
+    // set lower triangular of dmat to zero
 
-    *crval = 0.;
     for (int j = 0; j < n; j++) {
-        sol[j] = dvec[j];
-        *crval += work[j] * sol[j];
-        work[j] = 0.;
         for (int i = j + 1; i < n; i++) {
             dmat[i + j * n] = 0.;
         }
     }
-    *crval = -(*crval) / 2.;
+
+    // calculate value of the criterion at unconstrained minima
+
+    *crval = -dot(n, dvec, sol) / 2.;
+
+    // now we can return the unconstrained minimum in dvec
+
+    for (int i = 0; i < n; i++) {
+        dvec[i] = sol[i];
+    }
 
     // calculate the norm of each column of the A matrix
 
     for (int i = 0; i < q; i++) {
-        sum = 0.;
-        for (int j = 0; j < n; j++) {
-            sum += amat[j + i * n] * amat[j + i * n];
-        }
-        nbv[i] = sqrt(sum);
+        nbv[i] = sqrt(dot(n, &amat[i * n], &amat[i * n]));
     }
 
     *nact = 0;
