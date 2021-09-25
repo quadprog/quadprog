@@ -96,7 +96,7 @@ double calculate_vsmall() {
     double vsmall = 1e-60;
     do {
         vsmall += vsmall;
-    } while ((vsmall * .1 + 1.) <= 1.0 || (vsmall * .2 + 1.) <= 1.0);
+    } while ((vsmall * .1 + 1.) <= 1. || (vsmall * .2 + 1.) <= 1.);
     return vsmall;
 }
 
@@ -106,28 +106,22 @@ int qpgen2_(double *dmat, double *dvec, int n,
     int *iact, int *nact, int *iter,
     double *work, int factorized)
 {
-    int it1, nvl;
-    double sum;
     double vsmall = calculate_vsmall();
 
     int* pIterFull = &iter[0];
     int* pIterPartial = &iter[1];
 
     int r = n <= q ? n : q;
-    int iwzv = n;
-    int iwrv = iwzv + n;
-    int iwuv = iwrv + r;
-    int iwrm = iwuv + r + 1;
-    int iwsv = iwrm + r * (r + 1) / 2;
-    int iwnbv = iwsv + q;
-    double *zv = &work[iwzv];
-    double *rv = &work[iwrv];
-    double *uv = &work[iwuv];
-    double *rm = &work[iwrm];
-    double *sv = &work[iwsv];
-    double *nbv = &work[iwnbv];
+    double *dv = work;
+    double *zv = dv + n;
+    double *rv = zv + n;
+    double *uv = rv + r;
+    double *rm = uv + r + 1;
+    double *sv = rm + r * (r + 1) / 2;
+    double *nbv = sv + q;
+    int work_length = n + n + r + (r + 1) + r * (r + 1) / 2 + q + q;
 
-    for (int i = 0; i < iwnbv + q; i++) {
+    for (int i = 0; i < work_length; i++) {
         work[i] = 0.;
     }
 
@@ -136,24 +130,25 @@ int qpgen2_(double *dmat, double *dvec, int n,
         lagr[i] = 0.;
     }
 
-    // get the initial solution
+    // Initialisation. We want:
+    // - sol and dvec to contain G^-1 a, the unconstrained minimum;
+    // - dmat to contain L^-T, the inverse of the upper triangular Cholesky factor of G.
 
     for (int i = 0; i < n; i++) {
         sol[i] = dvec[i];
     }
 
     if (!factorized) {
-        if (cholesky(n, dmat) != 0) {
+        if (cholesky(n, dmat) != 0) { // now the upper triangle of dmat contains L^T
             return 2;
         }
-        triangular_solve_transpose(n, dmat, sol);
-        triangular_solve(n, dmat, sol);
-        triangular_invert(n, dmat);
+        triangular_solve_transpose(n, dmat, sol); // now sol contains L^-1 a
+        triangular_solve(n, dmat, sol);           // now sol contains L^-T L^-1 a = G^-1 a
+        triangular_invert(n, dmat);               // now dmat contains L^-T
     } else {
-        // Matrix D is already factorized, so we have to multiply d first with
-        // R^-T and then with R^-1.  R^-1 is stored in the upper half of the
-        // array dmat.
+        // dmat is already L^-T
 
+        // multiply sol by L^-T
         for (int j = n - 1; j >= 0; j--) {
             sol[j] *= dmat[j + j * n];
             for (int i = 0; i < j; i++) {
@@ -161,6 +156,7 @@ int qpgen2_(double *dmat, double *dvec, int n,
             }
         }
 
+        // multiply sol by L^-1
         for (int j = 0; j < n; j++) {
             sol[j] *= dmat[j + j * n];
             for (int i = j + 1; i < n; i++) {
@@ -169,7 +165,7 @@ int qpgen2_(double *dmat, double *dvec, int n,
         }
     }
 
-    // set lower triangular of dmat to zero
+    // Set the lower triangle of dmat to zero.
 
     for (int j = 0; j < n; j++) {
         for (int i = j + 1; i < n; i++) {
@@ -177,17 +173,18 @@ int qpgen2_(double *dmat, double *dvec, int n,
         }
     }
 
-    // calculate value of the criterion at unconstrained minima
+    // Calculate the objective value at the unconstrained minimum.
 
     *crval = -dot(n, dvec, sol) / 2.;
 
-    // now we can return the unconstrained minimum in dvec
+    // Store the unconstrained minimum in dvec for return.
 
     for (int i = 0; i < n; i++) {
         dvec[i] = sol[i];
     }
 
-    // calculate the norm of each column of the A matrix
+    // Calculate the norm of each column of the A matrix.
+    // This will be used in our pivoting rule.
 
     for (int i = 0; i < q; i++) {
         nbv[i] = sqrt(dot(n, &amat[i * n], &amat[i * n]));
@@ -198,23 +195,18 @@ int qpgen2_(double *dmat, double *dvec, int n,
 
     for (*pIterFull = 1; ; (*pIterFull)++) {
 
-        // calculate all constraints and check which are still violated
-        // for the equality constraints we have to check whether the normal
-        // vector has to be negated (as well as bvec in that case)
+        // Calculate the slack variables A^T x - b and store the result in sv.
 
         for (int i = 0; i < q; i++) {
-            sum = -bvec[i];
-            for (int j = 0; j < n; j++) {
-                sum += amat[j + i * n] * sol[j];
-            }
-            if (fabs(sum) < vsmall) {
-                sum = 0.;
+            double temp = dot(n, sol, &amat[i * n]) - bvec[i];
+            if (fabs(temp) < vsmall) {
+                temp = 0.;
             }
             if (i >= meq) {
-                sv[i] = sum;
+                sv[i] = temp;
             } else {
-                sv[i] = -fabs(sum);
-                if (sum > 0.) {
+                sv[i] = -fabs(temp);
+                if (temp > 0.) {
                     for (int j = 0; j < n; j++) {
                         amat[j + i * n] = -amat[j + i * n];
                     }
@@ -222,19 +214,17 @@ int qpgen2_(double *dmat, double *dvec, int n,
                 }
             }
         }
-
-        // as safeguard against rounding errors set already active constraints
-        // explicitly to zero
-
+        // Force the slack variables to zero for constraints in the active set,
+        // as a safeguard against rounding errors.
         for (int i = 0; i < *nact; i++) {
             sv[iact[i] - 1] = 0.;
         }
 
-        // we weight each violation by the number of non-zero elements in the
-        // corresponding row of A. then we choose the violated constraint which
-        // has maximal absolute value, i.e., the minimum.
+        // Choose a violated constraint to add to the active set.
+        // We choose the constraint with the largest violation.
+        // The index of the constraint to add is stored in nvl.
 
-        nvl = 0;
+        int nvl = 0;
         double max_violation = 0.;
         for (int i = 0; i < q; i++) {
             if (sv[i] < max_violation * nbv[i]) {
@@ -242,7 +232,10 @@ int qpgen2_(double *dmat, double *dvec, int n,
                 max_violation = sv[i] / nbv[i];
             }
         }
+
         if (nvl == 0) {
+            // All constraints are satisfied. We are at the optimum.
+
             for (int i = 0; i < *nact; i++) {
                 lagr[iact[i] - 1] = uv[i];
             }
@@ -252,80 +245,60 @@ int qpgen2_(double *dmat, double *dvec, int n,
         double slack = sv[nvl - 1];
 
         for (; ; (*pIterPartial)++) {
-            // calculate d=J^Tn^+ where n^+ is the normal vector of the violated
-            // constraint. J is stored in dmat in this implementation!!
-            // if we drop a constraint, we have to jump back here.
+            // Set dv = J^T n, where n is the column of A corresponding to the constraint
+            // that we are adding to the active set.
 
             for (int i = 0; i < n; i++) {
-                sum = 0.;
-                for (int j = 0; j < n; j++) {
-                    sum += dmat[j + i * n] * amat[j + (nvl - 1) * n];
-                }
-                work[i] = sum;
+                dv[i] = dot(n, &dmat[i * n], &amat[(nvl - 1) * n]);
             }
 
-            // Now calculate z = J_2 d_2
+            // Set zv = J_2 d_2. This is the step direction for the primal variable sol.
 
             for (int i = 0; i < n; i++) {
                 zv[i] = 0.;
             }
             for (int j = *nact; j < n; j++) {
-                for (int i = 0; i < n; i++) {
-                    zv[i] += dmat[i + j * n] * work[j];
-                }
+                axpy(n, dv[j], &dmat[j * n], zv);
             }
 
-            // and r = R^{-1} d_1, check also if r has positive elements (among the
-            // entries corresponding to inequalities constraints).
+            // Set rv = R^-1 d_1. This is (the negative of) the step direction for the dual variable uv.
 
             for (int i = *nact - 1; i >= 0; i--) {
-                sum = work[i];
-                int rm_offset = (i + 1) * (i + 2) / 2 - 1;
+                double temp = dv[i];
                 int k = 0;
-                for (int j = i + 1; j <= *nact; j++) {
-                    sum -= rm[rm_offset + i + 1 + k] * rv[j];
+                for (int j = i + 1; j < *nact; j++) {
+                    temp -= rm[(i + 2) * (i + 3) / 2 - 2 + k] * rv[j];
                     k += j + 1;
                 }
-                rv[i] = sum / rm[rm_offset];
+                rv[i] = temp / rm[(i + 1) * (i + 2) / 2 - 1];
             }
 
-            // if r has positive elements, find the partial step length t1, which is
-            // the maximum step in dual space without violating dual feasibility.
-            // it1  stores in which component t1, the min of u/r, occurs.
+            // Find the largest step length t1 before dual feasibility is violated.
+            // Store in it1 the index of the constraint to remove from the active set, if we get that far.
 
-            int t1inf = 1;
+            int t1inf = 1, it1;
             double t1;
             for (int i = 0; i < *nact; i++) {
                 if (iact[i] > meq && rv[i] > 0.) {
-                    double current = uv[i] / rv[i];
+                    double temp = uv[i] / rv[i];
                     if (t1inf) {
                         t1inf = 0;
-                        t1 = current;
+                        t1 = temp;
                         it1 = i + 1;
-                    } else if (current < t1) {
+                    } else if (temp < t1) {
                         it1 = i + 1;
                     }
                 }
             }
 
-            // test if the z vector is equal to zero
+            // Find the step length t2 to bring the slack variable to zero for the constraint we are adding to the active set.
+            // Store in ztn the rate at which the slack variable is increased. This is used to update the objective value below.
 
-            sum = 0.;
-            for (int i = 0; i < n; i++) {
-                sum += zv[i] * zv[i];
-            }
-            int t2inf = fabs(sum) <= vsmall;
-            double t2;
+            int t2inf = fabs(dot(n, zv, zv)) <= vsmall;
+            double t2, ztn;
             if (!t2inf) {
-                // compute full step length t2, minimum step in primal space such that */
-                // the constraint becomes feasible. */
-                // keep sum (which is z^Tn^+) to update crval below! */
-
-                sum = 0.;
-                for (int i = 0; i < n; i++) {
-                    sum += zv[i] * amat[i + (nvl - 1) * n];
-                }
-                t2 = -slack / sum;
+                ztn = dot(n, zv, &amat[(nvl - 1) * n]);
+                t2 = -slack / ztn;
             }
 
             if (t1inf && t2inf) {
@@ -333,30 +306,20 @@ int qpgen2_(double *dmat, double *dvec, int n,
                 return 1;
             }
 
-            double tt;
-            int t2min;
-            if (!t2inf && (t1inf || t1 >= t2)) {
-                tt = t2;
-                t2min = 1;
-            } else {
-                tt = t1;
-                t2min = 0;
-            }
+            // We will take a full step if t2 <= t1.
+            int t2min = !t2inf && (t1inf || t1 >= t2);
+            double tt = t2min ? t2 : t1;
 
             if (!t2inf) {
                 // Update primal variable
-                for (int i = 0; i < n; i++) {
-                    sol[i] += tt * zv[i];
-                }
+                axpy(n, tt, zv, sol);
 
                 // Update objective value
-                *crval += tt * sum * (tt / 2. + uv[*nact]);
+                *crval += tt * ztn * (tt / 2. + uv[*nact]);
             }
 
             // Update dual variable
-            for (int i = 0; i < *nact; i++) {
-                uv[i] -= tt * rv[i];
-            }
+            axpy(*nact, -tt, rv, uv);
             uv[*nact] += tt;
 
             if (t2min) {
@@ -379,15 +342,12 @@ int qpgen2_(double *dmat, double *dvec, int n,
                 // We took a step in primal space, but only took a partial step.
                 // So we need to update the slack variable that we are currently bringing to zero.
 
-                sum = -bvec[nvl - 1];
-                for (int j = 0; j < n; j++) {
-                    sum += sol[j] * amat[j + (nvl - 1) * n];
-                }
+                double temp = dot(n, sol, &amat[(nvl - 1) * n]) - bvec[nvl - 1];
                 if (nvl > meq) {
-                    slack = sum;
+                    slack = temp;
                 } else {
-                    slack = -fabs(sum);
-                    if (sum > 0.) {
+                    slack = -fabs(temp);
+                    if (temp > 0.) {
                         for (int j = 0; j < n; j++) {
                             amat[j + (nvl - 1) * n] = -amat[j + (nvl - 1) * n];
                         }
@@ -401,6 +361,6 @@ int qpgen2_(double *dmat, double *dvec, int n,
 
         ++(*nact);
         iact[*nact - 1] = nvl;
-        qr_insert(n, *nact, work, dmat, rm);
+        qr_insert(n, *nact, dv, dmat, rm);
     }
 }
