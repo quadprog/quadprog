@@ -75,19 +75,14 @@
 /*  work  vector with length at least 2*n+r*(r+5)/2 + 2*q +1 */
 /*        where r=min(n,q) */
 
-#define abs(x) ((x) >= 0 ? (x) : -(x))
-#define min(a,b) ((a) <= (b) ? (a) : (b))
-#define max(a,b) ((a) >= (b) ? (a) : (b))
+double fabs(double);
+double hypot(double, double);
+double sqrt(double);
 
 void triangular_solve(int n, double a[], double b[]);
 void triangular_solve_transpose(int n, double a[], double b[]);
 void triangular_invert(int n, double a[]);
 int cholesky(int n, double a[]);
-
-double d_sign(double *a, double *b) {
-    double x = (*a >= 0 ? *a : -*a);
-    return *b >= 0 ? x : -x;
-}
 
 /*
  * code gleaned from Powell's ZQPCVX routine to determine a small
@@ -108,9 +103,7 @@ int qpgen2_(double *dmat, double *dvec, int n,
     int *iact, int *nact, int *iter,
     double *work, int factorized)
 {
-    double d__1, d__2, d__3, d__4;
-
-    double t1, gc, gs, nu, tt;
+    double t1, tt;
     int it1, nvl;
     double sum;
     double temp;
@@ -123,7 +116,7 @@ int qpgen2_(double *dmat, double *dvec, int n,
     // calculate some constants, i.e., from which index on the different
     // quantities are stored in the work matrix
 
-    int r = min(n, q);
+    int r = n <= q ? n : q;
     int iwzv = n;
     int iwrv = iwzv + n;
     int iwuv = iwrv + r;
@@ -223,13 +216,13 @@ DONE_FULL_STEP:
         for (int j = 0; j < n; j++) {
             sum += amat[j + i * n] * sol[j];
         }
-        if (abs(sum) < vsmall) {
+        if (fabs(sum) < vsmall) {
             sum = 0.;
         }
         if (i >= meq) {
             sv[i] = sum;
         } else {
-            sv[i] = -abs(sum);
+            sv[i] = -fabs(sum);
             if (sum > 0.) {
                 for (int j = 0; j < n; j++) {
                     amat[j + i * n] = -amat[j + i * n];
@@ -328,7 +321,7 @@ DONE_PARTIAL_STEP:
     for (int i = 0; i < n; i++) {
         sum += zv[i] * zv[i];
     }
-    if (abs(sum) <= vsmall) {
+    if (fabs(sum) <= vsmall) {
         // No step in primal space such that the new constraint becomes
         // feasible. Take step in dual space and drop a constant.
 
@@ -402,17 +395,23 @@ DONE_PARTIAL_STEP:
                 // if it is already zero we don't have to do anything, except of
                 // decreasing l1
 
-                if (work[i] != 0.) {
-                    // Computing MAX
-                    d__3 = (d__1 = work[i - 1], abs(d__1)), d__4 = (d__2 = work[i], abs(d__2));
-                    gc = max(d__3,d__4);
-                    // Computing MIN
-                    d__3 = (d__1 = work[i - 1], abs(d__1)), d__4 = (d__2 = work[i], abs(d__2));
-                    gs = min(d__3,d__4);
-                    d__1 = gc * sqrt((gs / gc) * (gs / gc) + 1);
-                    temp = d_sign(&d__1, &work[i - 1]);
-                    gc = work[i - 1] / temp;
-                    gs = work[i] / temp;
+                if (work[i] != 0. && work[i - 1] == 0.) {
+                    work[i - 1] = work[i];
+                    for (int j = 0; j < n; j++) {
+                        temp = dmat[j + (i - 1) * n];
+                        dmat[j + (i - 1) * n] = dmat[j + i * n];
+                        dmat[j + i * n] = temp;
+                    }
+                } else if (work[i] != 0.) {
+                    double h = hypot(work[i - 1], work[i]);
+
+                    if (work[i - 1] < 0.0) {
+                        h = -h;
+                    }
+
+                    double gc = work[i - 1] / h;
+                    double gs = work[i] / h;
+                    double nu = work[i] / (work[i - 1] + h);
 
                     // The Givens rotation is done with the matrix (gc gs, gs -gc).
                     // If gc is one, then element (i) of d is zero compared with element
@@ -423,21 +422,11 @@ DONE_PARTIAL_STEP:
                     // Otherwise we have to apply the Givens rotation to these columns.
                     // The i-1 element of d has to be updated to temp.
 
-                    if (gc == 0.) {
-                        work[i - 1] = gs * temp;
-                        for (int j = 0; j < n; j++) {
-                            temp = dmat[j + (i - 1) * n];
-                            dmat[j + (i - 1) * n] = dmat[j + i * n];
-                            dmat[j + i * n] = temp;
-                        }
-                    } else if (gc != 1.) {
-                        work[i - 1] = temp;
-                        nu = gs / (gc + 1.);
-                        for (int j = 0; j < n; j++) {
-                            temp = gc * dmat[j + (i - 1) * n] + gs * dmat[j + i * n];
-                            dmat[j + i * n] = nu * (dmat[j + (i - 1) * n] + temp) - dmat[j + i * n];
-                            dmat[j + (i - 1) * n] = temp;
-                        }
+                    work[i - 1] = h;
+                    for (int j = 0; j < n; j++) {
+                        temp = gc * dmat[j + (i - 1) * n] + gs * dmat[j + i * n];
+                        dmat[j + i * n] = nu * (dmat[j + (i - 1) * n] + temp) - dmat[j + i * n];
+                        dmat[j + (i - 1) * n] = temp;
                     }
                 }
             }
@@ -460,7 +449,7 @@ DONE_PARTIAL_STEP:
             if (nvl > meq) {
                 sv[nvl - 1] = sum;
             } else {
-                sv[nvl - 1] = -abs(sum);
+                sv[nvl - 1] = -fabs(sum);
                 if (sum > 0.) {
                     for (int j = 0; j < n; j++) {
                         amat[j + (nvl - 1) * n] = -amat[j + (nvl - 1) * n];
@@ -486,17 +475,28 @@ DONE_PARTIAL_STEP:
 
         int l = it1 * (it1 + 1) / 2;
         int l1 = l + it1;
-        if (rm[l1] != 0.) {
-            // Computing MAX
-            d__3 = (d__1 = rm[l1 - 1], abs(d__1)), d__4 = (d__2 = rm[l1], abs(d__2));
-            gc = max(d__3,d__4);
-            // Computing MIN
-            d__3 = (d__1 = rm[l1 - 1], abs(d__1)), d__4 = (d__2 = rm[l1], abs(d__2));
-            gs = min(d__3,d__4);
-            d__1 = gc * sqrt((gs / gc) * (gs / gc) + 1);
-            temp = d_sign(&d__1, &rm[l1 - 1]);
-            gc = rm[l1 - 1] / temp;
-            gs = rm[l1] / temp;
+        if (rm[l1] != 0. && rm[l1 - 1] == 0.) {
+            for (int i = it1 + 1; i <= *nact; i++) {
+                temp = rm[l1 - 1];
+                rm[l1 - 1] = rm[l1];
+                rm[l1] = temp;
+                l1 += i;
+            }
+            for (int i = 0; i < n; i++) {
+                temp = dmat[i + (it1-1) * n];
+                dmat[i + (it1 - 1) * n] = dmat[i + (it1) * n];
+                dmat[i + (it1) * n] = temp;
+            }
+        } else if (rm[l1] != 0.) {
+            double h = hypot(rm[l1 - 1], rm[l1]);
+
+            if (rm[l1 - 1] < 0.0) {
+                h = -h;
+            }
+
+            double gc = rm[l1 - 1] / h;
+            double gs = rm[l1] / h;
+            double nu = rm[l1] / (rm[l1 - 1] + h);
 
             // The Givens rotatin is done with the matrix (gc gs, gs -gc).
             // If gc is one, then element (it1+1,it1+1) of R is zero compared with
@@ -506,31 +506,16 @@ DONE_PARTIAL_STEP:
             // R and columns in J, we can ignore the sign of gs.
             // Otherwise we have to apply the Givens rotation to these rows/columns.
 
-            if (gc == 0.) {
-                for (int i = it1 + 1; i <= *nact; i++) {
-                    temp = rm[l1 - 1];
-                    rm[l1 - 1] = rm[l1];
-                    rm[l1] = temp;
-                    l1 += i;
-                }
-                for (int i = 0; i < n; i++) {
-                    temp = dmat[i + (it1-1) * n];
-                    dmat[i + (it1-1) * n] = dmat[i + (it1) * n];
-                    dmat[i + (it1) * n] = temp;
-                }
-            } else if (gc != 1.) {
-                nu = gs / (gc + 1.);
-                for (int i = it1 + 1; i <= *nact; i++) {
-                    temp = gc * rm[l1 - 1] + gs * rm[l1];
-                    rm[l1] = nu * (rm[l1 - 1] + temp) - rm[l1];
-                    rm[l1 - 1] = temp;
-                    l1 += i;
-                }
-                for (int i = 0; i < n; i++) {
-                    temp = gc * dmat[i + (it1-1) * n] + gs * dmat[i + (it1) * n];
-                    dmat[i + (it1) * n] = nu * (dmat[i + (it1-1) * n] + temp) - dmat[i + (it1) * n];
-                    dmat[i + (it1-1) * n] = temp;
-                }
+            for (int i = it1 + 1; i <= *nact; i++) {
+                temp = gc * rm[l1 - 1] + gs * rm[l1];
+                rm[l1] = nu * (rm[l1 - 1] + temp) - rm[l1];
+                rm[l1 - 1] = temp;
+                l1 += i;
+            }
+            for (int i = 0; i < n; i++) {
+                temp = gc * dmat[i + (it1-1) * n] + gs * dmat[i + (it1) * n];
+                dmat[i + (it1) * n] = nu * (dmat[i + (it1-1) * n] + temp) - dmat[i + (it1) * n];
+                dmat[i + (it1-1) * n] = temp;
             }
         }
 
