@@ -2,11 +2,11 @@ import numpy as np
 from libc.stdio cimport printf
 
 cdef extern nogil:
-    int qpgen2_(double *dmat, double *dvec, int n,
-                double *sol, double *lagr, double *crval,
-                double *amat, double *bvec, int q, int meq,
+    int qpgen2_(double *G, double *av, int n,
+                double *xv, double *lagr, double *obj,
+                double *C, double *bv, int q, int meq,
                 int* iact, int* nact, int* iter,
-                double* work, int ierr)
+                double* work, int factorized)
 
 
 def solve_qp(double[:, :] G, double[:] a, double[:, :] C=None, double[:] b=None, int meq=0, factorized=False):
