@@ -76,7 +76,6 @@
 /*        where r=min(n,q) */
 
 double fabs(double);
-double hypot(double, double);
 double sqrt(double);
 
 double dot(int n, double x[], double y[]);
