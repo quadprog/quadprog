@@ -107,18 +107,12 @@ int qpgen2_(double *dmat, double *dvec, int n,
     int *iact, int *nact, int *iter,
     double *work, int factorized)
 {
-    double t1, tt;
     int it1, nvl;
     double sum;
-    double temp;
-    int t1inf, t2min;
     double vsmall = calculate_vsmall();
 
     int* pIterFull = &iter[0];
     int* pIterPartial = &iter[1];
-
-    // calculate some constants, i.e., from which index on the different
-    // quantities are stored in the work matrix
 
     int r = n <= q ? n : q;
     int iwzv = n;
@@ -201,221 +195,213 @@ int qpgen2_(double *dmat, double *dvec, int n,
     }
 
     *nact = 0;
-    *pIterFull = 0;
     *pIterPartial = 0;
 
-DONE_FULL_STEP:
+    for (*pIterFull = 1; ; (*pIterFull)++) {
 
-    // start a new iteration
+        // calculate all constraints and check which are still violated
+        // for the equality constraints we have to check whether the normal
+        // vector has to be negated (as well as bvec in that case)
 
-    ++*pIterFull;
-
-    // calculate all constraints and check which are still violated
-    // for the equality constraints we have to check whether the normal
-    // vector has to be negated (as well as bvec in that case)
-
-    for (int i = 0; i < q; i++) {
-        sum = -bvec[i];
-        for (int j = 0; j < n; j++) {
-            sum += amat[j + i * n] * sol[j];
-        }
-        if (fabs(sum) < vsmall) {
-            sum = 0.;
-        }
-        if (i >= meq) {
-            sv[i] = sum;
-        } else {
-            sv[i] = -fabs(sum);
-            if (sum > 0.) {
-                for (int j = 0; j < n; j++) {
-                    amat[j + i * n] = -amat[j + i * n];
-                }
-                bvec[i] = -bvec[i];
-            }
-        }
-    }
-
-    // as safeguard against rounding errors set already active constraints
-    // explicitly to zero
-
-    for (int i = 0; i < *nact; i++) {
-        sv[iact[i] - 1] = 0.;
-    }
-
-    // we weight each violation by the number of non-zero elements in the
-    // corresponding row of A. then we choose the violated constraint which
-    // has maximal absolute value, i.e., the minimum.
-
-    nvl = 0;
-    temp = 0.;
-    for (int i = 0; i < q; i++) {
-        if (sv[i] < temp * nbv[i]) {
-            nvl = i + 1;
-            temp = sv[i] / nbv[i];
-        }
-    }
-    if (nvl == 0) {
-        for (int i = 0; i < *nact; i++) {
-            lagr[iact[i] - 1] = uv[i];
-        }
-        return 0;
-    }
-
-DONE_PARTIAL_STEP:
-
-    // calculate d=J^Tn^+ where n^+ is the normal vector of the violated
-    // constraint. J is stored in dmat in this implementation!!
-    // if we drop a constraint, we have to jump back here.
-
-    for (int i = 0; i < n; i++) {
-        sum = 0.;
-        for (int j = 0; j < n; j++) {
-            sum += dmat[j + i * n] * amat[j + (nvl - 1) * n];
-        }
-        work[i] = sum;
-    }
-
-    // Now calculate z = J_2 d_2
-
-    for (int i = 0; i < n; i++) {
-        zv[i] = 0.;
-    }
-    for (int j = *nact; j < n; j++) {
-        for (int i = 0; i < n; i++) {
-            zv[i] += dmat[i + j * n] * work[j];
-        }
-    }
-
-    // and r = R^{-1} d_1, check also if r has positive elements (among the
-    // entries corresponding to inequalities constraints).
-
-    for (int i = *nact - 1; i >= 0; i--) {
-        sum = work[i];
-        int rm_offset = (i + 1) * (i + 2) / 2 - 1;
-        int k = 0;
-        for (int j = i + 1; j <= *nact; j++) {
-            sum -= rm[rm_offset + i + 1 + k] * rv[j];
-            k += j + 1;
-        }
-        rv[i] = sum / rm[rm_offset];
-    }
-
-    // if r has positive elements, find the partial step length t1, which is
-    // the maximum step in dual space without violating dual feasibility.
-    // it1  stores in which component t1, the min of u/r, occurs.
-
-    t1inf = 1;
-    for (int i = 0; i < *nact; i++) {
-        if (iact[i] > meq && rv[i] > 0.) {
-            double current = uv[i] / rv[i];
-            if (t1inf) {
-                t1inf = 0;
-                t1 = current;
-                it1 = i + 1;
-            } else if (current < t1) {
-                it1 = i + 1;
-            }
-        }
-    }
-
-    // test if the z vector is equal to zero
-
-    sum = 0.;
-    for (int i = 0; i < n; i++) {
-        sum += zv[i] * zv[i];
-    }
-    if (fabs(sum) <= vsmall) {
-        // No step in primal space such that the new constraint becomes
-        // feasible. Take step in dual space and drop a constant.
-
-        if (t1inf) {
-            // No step in dual space possible either, problem is not solvable
-            return 1;
-        }
-
-        // we take a partial step in dual space and drop constraint it1,
-        // that is, we drop the it1-th active constraint.
-        // then we continue at step 2(a) (marked by label 55)
-
-        for (int i = 0; i < *nact; i++) {
-            uv[i] -= t1 * rv[i];
-        }
-        uv[*nact] += t1;
-    } else {
-        // compute full step length t2, minimum step in primal space such that */
-        // the constraint becomes feasible. */
-        // keep sum (which is z^Tn^+) to update crval below! */
-
-        sum = 0.;
-        for (int i = 0; i < n; i++) {
-            sum += zv[i] * amat[i + (nvl - 1) * n];
-        }
-        tt = -sv[nvl - 1] / sum;
-        t2min = 1;
-        if (!t1inf && t1 < tt) {
-            tt = t1;
-            t2min = 0;
-        }
-
-        // take step in primal and dual space
-
-        for (int i = 0; i < n; i++) {
-            sol[i] += tt * zv[i];
-        }
-        *crval += tt * sum * (tt / 2. + uv[*nact]);
-        for (int i = 0; i < *nact; i++) {
-            uv[i] -= tt * rv[i];
-        }
-        uv[*nact] += tt;
-
-        // if it was a full step, then we check wheter further constraints are
-        // violated otherwise we can drop the current constraint and iterate once
-        // more
-        if (t2min) {
-            // we took a full step. Thus add constraint nvl to the list of active
-            // constraints and update J and R
-
-            ++(*nact);
-            iact[*nact - 1] = nvl;
-            qr_insert(n, *nact, work, dmat, rm);
-
-            goto DONE_FULL_STEP;
-        } else {
-            // we took a partial step in dual space. Thus drop constraint it1,
-            // that is, we drop the it1-th active constraint.
-            // then we continue at step 2(a) (marked by label 55)
-            // but since the fit changed, we have to recalculate now "how much"
-            // the fit violates the chosen constraint now.
-
-            sum = -bvec[nvl-1];
+        for (int i = 0; i < q; i++) {
+            sum = -bvec[i];
             for (int j = 0; j < n; j++) {
-                sum += sol[j] * amat[j + (nvl-1) * n];
+                sum += amat[j + i * n] * sol[j];
             }
-            if (nvl > meq) {
-                sv[nvl - 1] = sum;
+            if (fabs(sum) < vsmall) {
+                sum = 0.;
+            }
+            if (i >= meq) {
+                sv[i] = sum;
             } else {
-                sv[nvl - 1] = -fabs(sum);
+                sv[i] = -fabs(sum);
                 if (sum > 0.) {
                     for (int j = 0; j < n; j++) {
-                        amat[j + (nvl - 1) * n] = -amat[j + (nvl - 1) * n];
+                        amat[j + i * n] = -amat[j + i * n];
                     }
-                    bvec[nvl - 1] = -bvec[nvl - 1];
+                    bvec[i] = -bvec[i];
                 }
             }
         }
-    }
 
-    // Drop constraint it1
-    qr_delete(n, *nact, it1, dmat, rm);
-    for (int i = it1; i < *nact; i++) {
-        uv[i - 1] = uv[i];
-        iact[i - 1] = iact[i];
-    }
-    uv[*nact-1] = uv[*nact];
-    uv[*nact] = 0.;
-    iact[*nact-1] = 0;
-    --(*nact);
-    ++(*pIterPartial);
+        // as safeguard against rounding errors set already active constraints
+        // explicitly to zero
 
-    goto DONE_PARTIAL_STEP;
+        for (int i = 0; i < *nact; i++) {
+            sv[iact[i] - 1] = 0.;
+        }
+
+        // we weight each violation by the number of non-zero elements in the
+        // corresponding row of A. then we choose the violated constraint which
+        // has maximal absolute value, i.e., the minimum.
+
+        nvl = 0;
+        double max_violation = 0.;
+        for (int i = 0; i < q; i++) {
+            if (sv[i] < max_violation * nbv[i]) {
+                nvl = i + 1;
+                max_violation = sv[i] / nbv[i];
+            }
+        }
+        if (nvl == 0) {
+            for (int i = 0; i < *nact; i++) {
+                lagr[iact[i] - 1] = uv[i];
+            }
+            return 0;
+        }
+
+        double slack = sv[nvl - 1];
+
+        for (; ; (*pIterPartial)++) {
+            // calculate d=J^Tn^+ where n^+ is the normal vector of the violated
+            // constraint. J is stored in dmat in this implementation!!
+            // if we drop a constraint, we have to jump back here.
+
+            for (int i = 0; i < n; i++) {
+                sum = 0.;
+                for (int j = 0; j < n; j++) {
+                    sum += dmat[j + i * n] * amat[j + (nvl - 1) * n];
+                }
+                work[i] = sum;
+            }
+
+            // Now calculate z = J_2 d_2
+
+            for (int i = 0; i < n; i++) {
+                zv[i] = 0.;
+            }
+            for (int j = *nact; j < n; j++) {
+                for (int i = 0; i < n; i++) {
+                    zv[i] += dmat[i + j * n] * work[j];
+                }
+            }
+
+            // and r = R^{-1} d_1, check also if r has positive elements (among the
+            // entries corresponding to inequalities constraints).
+
+            for (int i = *nact - 1; i >= 0; i--) {
+                sum = work[i];
+                int rm_offset = (i + 1) * (i + 2) / 2 - 1;
+                int k = 0;
+                for (int j = i + 1; j <= *nact; j++) {
+                    sum -= rm[rm_offset + i + 1 + k] * rv[j];
+                    k += j + 1;
+                }
+                rv[i] = sum / rm[rm_offset];
+            }
+
+            // if r has positive elements, find the partial step length t1, which is
+            // the maximum step in dual space without violating dual feasibility.
+            // it1  stores in which component t1, the min of u/r, occurs.
+
+            int t1inf = 1;
+            double t1;
+            for (int i = 0; i < *nact; i++) {
+                if (iact[i] > meq && rv[i] > 0.) {
+                    double current = uv[i] / rv[i];
+                    if (t1inf) {
+                        t1inf = 0;
+                        t1 = current;
+                        it1 = i + 1;
+                    } else if (current < t1) {
+                        it1 = i + 1;
+                    }
+                }
+            }
+
+            // test if the z vector is equal to zero
+
+            sum = 0.;
+            for (int i = 0; i < n; i++) {
+                sum += zv[i] * zv[i];
+            }
+            int t2inf = fabs(sum) <= vsmall;
+            double t2;
+            if (!t2inf) {
+                // compute full step length t2, minimum step in primal space such that */
+                // the constraint becomes feasible. */
+                // keep sum (which is z^Tn^+) to update crval below! */
+
+                sum = 0.;
+                for (int i = 0; i < n; i++) {
+                    sum += zv[i] * amat[i + (nvl - 1) * n];
+                }
+                t2 = -slack / sum;
+            }
+
+            if (t1inf && t2inf) {
+                // Can step infinitely far; dual problem is unbounded and primal problem is infeasible.
+                return 1;
+            }
+
+            double tt;
+            int t2min;
+            if (!t2inf && (t1inf || t1 >= t2)) {
+                tt = t2;
+                t2min = 1;
+            } else {
+                tt = t1;
+                t2min = 0;
+            }
+
+            if (!t2inf) {
+                // Update primal variable
+                for (int i = 0; i < n; i++) {
+                    sol[i] += tt * zv[i];
+                }
+
+                // Update objective value
+                *crval += tt * sum * (tt / 2. + uv[*nact]);
+            }
+
+            // Update dual variable
+            for (int i = 0; i < *nact; i++) {
+                uv[i] -= tt * rv[i];
+            }
+            uv[*nact] += tt;
+
+            if (t2min) {
+                break;
+            }
+
+            // Remove constraint it1 from the active set.
+
+            qr_delete(n, *nact, it1, dmat, rm);
+            for (int i = it1; i < *nact; i++) {
+                uv[i - 1] = uv[i];
+                iact[i - 1] = iact[i];
+            }
+            uv[*nact - 1] = uv[*nact];
+            uv[*nact] = 0.;
+            iact[*nact-1] = 0;
+            --(*nact);
+
+            if (!t2inf) {
+                // We took a step in primal space, but only took a partial step.
+                // So we need to update the slack variable that we are currently bringing to zero.
+
+                sum = -bvec[nvl - 1];
+                for (int j = 0; j < n; j++) {
+                    sum += sol[j] * amat[j + (nvl - 1) * n];
+                }
+                if (nvl > meq) {
+                    slack = sum;
+                } else {
+                    slack = -fabs(sum);
+                    if (sum > 0.) {
+                        for (int j = 0; j < n; j++) {
+                            amat[j + (nvl - 1) * n] = -amat[j + (nvl - 1) * n];
+                        }
+                        bvec[nvl - 1] = -bvec[nvl - 1];
+                    }
+                }
+            }
+        }
+
+        // Add constraint nvl to the active set.
+
+        ++(*nact);
+        iact[*nact - 1] = nvl;
+        qr_insert(n, *nact, work, dmat, rm);
+    }
 }
