@@ -85,6 +85,9 @@ void triangular_solve_transpose(int n, double a[], double b[]);
 void triangular_invert(int n, double a[]);
 int cholesky(int n, double a[]);
 
+void qr_insert(int n, int r, double a[], double Q[], double R[]);
+void qr_delete(int n, int r, int col, double Q[], double R[]);
+
 /*
  * code gleaned from Powell's ZQPCVX routine to determine a small
  * number that can be assumed to be an upper bound on the relative
@@ -111,8 +114,8 @@ int qpgen2_(double *dmat, double *dvec, int n,
     int t1inf, t2min;
     double vsmall = calculate_vsmall();
 
-    int* pIterMain = &iter[0];
-    int* pIterDeleted = &iter[1];
+    int* pIterFull = &iter[0];
+    int* pIterPartial = &iter[1];
 
     // calculate some constants, i.e., from which index on the different
     // quantities are stored in the work matrix
@@ -198,14 +201,14 @@ int qpgen2_(double *dmat, double *dvec, int n,
     }
 
     *nact = 0;
-    *pIterMain = 0;
-    *pIterDeleted = 0;
+    *pIterFull = 0;
+    *pIterPartial = 0;
 
 DONE_FULL_STEP:
 
     // start a new iteration
 
-    ++*pIterMain;
+    ++*pIterFull;
 
     // calculate all constraints and check which are still violated
     // for the equality constraints we have to check whether the normal
@@ -374,65 +377,7 @@ DONE_PARTIAL_STEP:
 
             ++(*nact);
             iact[*nact - 1] = nvl;
-
-            // to update R we have to put the first nact-1 components of the d vector
-            // into column (nact) of R
-
-            for (int i = 0; i < *nact - 1; i++) {
-                rm[(*nact - 1) * *nact / 2 + i] = work[i];
-            }
-
-            // if now nact=n, then we just have to add the last element to the new
-            // row of R.
-            // Otherwise we use Givens transformations to turn the vector d(nact:n)
-            // into a multiple of the first unit vector. That multiple goes into the
-            // last element of the new row of R and J is accordingly updated by the
-            // Givens transformations.
-
-            for (int i = n - 1; i >= *nact; i--) {
-                // we have to find the Givens rotation which will reduce the element
-                // (l1) of d to zero.
-                // if it is already zero we don't have to do anything, except of
-                // decreasing l1
-
-                if (work[i] != 0. && work[i - 1] == 0.) {
-                    work[i - 1] = work[i];
-                    for (int j = 0; j < n; j++) {
-                        temp = dmat[j + (i - 1) * n];
-                        dmat[j + (i - 1) * n] = dmat[j + i * n];
-                        dmat[j + i * n] = temp;
-                    }
-                } else if (work[i] != 0.) {
-                    double h = hypot(work[i - 1], work[i]);
-
-                    if (work[i - 1] < 0.0) {
-                        h = -h;
-                    }
-
-                    double gc = work[i - 1] / h;
-                    double gs = work[i] / h;
-                    double nu = work[i] / (work[i - 1] + h);
-
-                    // The Givens rotation is done with the matrix (gc gs, gs -gc).
-                    // If gc is one, then element (i) of d is zero compared with element
-                    // (l1-1). Hence we don't have to do anything.
-                    // If gc is zero, then we just have to switch column (i) and column (i-1)
-                    // of J. Since we only switch columns in J, we have to be careful how we
-                    // update d depending on the sign of gs.
-                    // Otherwise we have to apply the Givens rotation to these columns.
-                    // The i-1 element of d has to be updated to temp.
-
-                    work[i - 1] = h;
-                    for (int j = 0; j < n; j++) {
-                        temp = gc * dmat[j + (i - 1) * n] + gs * dmat[j + i * n];
-                        dmat[j + i * n] = nu * (dmat[j + (i - 1) * n] + temp) - dmat[j + i * n];
-                        dmat[j + (i - 1) * n] = temp;
-                    }
-                }
-            }
-
-            // So store d(nact) in R(nact,nact)
-            rm[(*nact) * (*nact + 1) / 2 - 1] = work[*nact - 1];
+            qr_insert(n, *nact, work, dmat, rm);
 
             goto DONE_FULL_STEP;
         } else {
@@ -461,84 +406,16 @@ DONE_PARTIAL_STEP:
     }
 
     // Drop constraint it1
-
-    // if it1 = nact it is only necessary to update the vector u and nact
-    for (; it1 < *nact; it1++) {
-        // After updating one row of R (column of J) we will also come back here
-
-        // we have to find the Givens rotation which will reduce the element
-        // (it1+1,it1+1) of R to zero.
-        // if it is already zero we don't have to do anything except of updating
-        // u, iact, and shifting column (it1+1) of R to column (it1)
-        // l  will point to element (1,it1+1) of R
-        // l1 will point to element (it1+1,it1+1) of R
-
-        int l = it1 * (it1 + 1) / 2;
-        int l1 = l + it1;
-        if (rm[l1] != 0. && rm[l1 - 1] == 0.) {
-            for (int i = it1 + 1; i <= *nact; i++) {
-                temp = rm[l1 - 1];
-                rm[l1 - 1] = rm[l1];
-                rm[l1] = temp;
-                l1 += i;
-            }
-            for (int i = 0; i < n; i++) {
-                temp = dmat[i + (it1-1) * n];
-                dmat[i + (it1 - 1) * n] = dmat[i + (it1) * n];
-                dmat[i + (it1) * n] = temp;
-            }
-        } else if (rm[l1] != 0.) {
-            double h = hypot(rm[l1 - 1], rm[l1]);
-
-            if (rm[l1 - 1] < 0.0) {
-                h = -h;
-            }
-
-            double gc = rm[l1 - 1] / h;
-            double gs = rm[l1] / h;
-            double nu = rm[l1] / (rm[l1 - 1] + h);
-
-            // The Givens rotatin is done with the matrix (gc gs, gs -gc).
-            // If gc is one, then element (it1+1,it1+1) of R is zero compared with
-            // element (it1,it1+1). Hence we don't have to do anything.
-            // if gc is zero, then we just have to switch row (it1) and row (it1+1)
-            // of R and column (it1) and column (it1+1) of J. Since we swithc rows in
-            // R and columns in J, we can ignore the sign of gs.
-            // Otherwise we have to apply the Givens rotation to these rows/columns.
-
-            for (int i = it1 + 1; i <= *nact; i++) {
-                temp = gc * rm[l1 - 1] + gs * rm[l1];
-                rm[l1] = nu * (rm[l1 - 1] + temp) - rm[l1];
-                rm[l1 - 1] = temp;
-                l1 += i;
-            }
-            for (int i = 0; i < n; i++) {
-                temp = gc * dmat[i + (it1-1) * n] + gs * dmat[i + (it1) * n];
-                dmat[i + (it1) * n] = nu * (dmat[i + (it1-1) * n] + temp) - dmat[i + (it1) * n];
-                dmat[i + (it1-1) * n] = temp;
-            }
-        }
-
-        // shift column (it1+1) of R to column (it1) (that is, the first it1
-        // elements). The posit1on of element (1,it1+1) of R was calculated above
-        // and stored in l.
-
-        for (int i = 0; i < it1; i++) {
-            rm[l + i - it1] = rm[l + i];
-        }
-
-        // update vector u and iact as necessary
-        // Continue with updating the matrices J and R
-
-        uv[it1-1] = uv[it1];
-        iact[it1-1] = iact[it1];
+    qr_delete(n, *nact, it1, dmat, rm);
+    for (int i = it1; i < *nact; i++) {
+        uv[i - 1] = uv[i];
+        iact[i - 1] = iact[i];
     }
-
     uv[*nact-1] = uv[*nact];
     uv[*nact] = 0.;
     iact[*nact-1] = 0;
     --(*nact);
-    ++(*pIterDeleted);
+    ++(*pIterPartial);
 
     goto DONE_PARTIAL_STEP;
 }

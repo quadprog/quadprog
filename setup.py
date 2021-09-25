@@ -29,6 +29,7 @@ classifiers = [
 
 extensions = [Extension('quadprog', [
     'quadprog/linear-algebra.c',
+    'quadprog/qr-update.c',
     'quadprog/quadprog.c',
     'quadprog/solve.QP.c',
 ])]
