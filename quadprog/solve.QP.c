@@ -63,10 +63,8 @@ double calculate_vsmall() {
  * n      the dimension of G and av
  *
  * C      nxq matrix, the constraint matrix C from above (C^T = (C1 C2)^T)
- *        *** ENTRIES CORRESPONDING TO EQUALITY CONSTRAINTS MAY HAVE CHANGED SIGNS ON EXIT ***
  *
- * bv     qx1 vector, the constraint vector b from above (b^T = (b1^T b2^T))
- *        *** ENTRIES CORRESPONDING TO EQUALITY CONSTRAINTS MAY HAVE CHANGED SIGNS ON EXIT ***
+ * bv     qx1 vector, the constraint vector b from above (b^T = (b1 b2)^T)
  *
  * q      the number of constraints.
  *
@@ -188,20 +186,7 @@ int qpgen2_(double *G, double *av, int n,
 
         for (int i = 0; i < q; i++) {
             double temp = dot(n, xv, &C[i * n]) - bv[i];
-            if (fabs(temp) < vsmall) {
-                temp = 0.;
-            }
-            if (i >= meq) {
-                sv[i] = temp;
-            } else {
-                sv[i] = -fabs(temp);
-                if (temp > 0.) {
-                    for (int j = 0; j < n; j++) {
-                        C[j + i * n] = -C[j + i * n];
-                    }
-                    bv[i] = -bv[i];
-                }
-            }
+            sv[i] = fabs(temp) < vsmall ? 0. : temp;
         }
         // Force the slack variables to zero for constraints in the active set,
         // as a safeguard against rounding errors.
@@ -216,7 +201,10 @@ int qpgen2_(double *G, double *av, int n,
         int iadd = 0;
         double max_violation = 0.;
         for (int i = 0; i < q; i++) {
-            if (sv[i] < max_violation * nbv[i]) {
+            if (sv[i] < -max_violation * nbv[i]) {
+                iadd = i + 1;
+                max_violation = -sv[i] / nbv[i];
+            } else if (i < meq && sv[i] > max_violation * nbv[i]) {
                 iadd = i + 1;
                 max_violation = sv[i] / nbv[i];
             }
@@ -232,7 +220,7 @@ int qpgen2_(double *G, double *av, int n,
         }
 
         double slack = sv[iadd - 1];
-
+        double reverse_step = slack > 0.;
         double u = 0;
 
         for (; ; (*pIterPartial)++) {
@@ -268,9 +256,9 @@ int qpgen2_(double *G, double *av, int n,
             int t1inf = 1, idel;
             double t1;
             for (int i = 0; i < *nact; i++) {
-                if (iact[i] > meq && rv[i] > 0.) {
-                    double temp = uv[i] / rv[i];
-                    if (t1inf || temp < t1) {
+                if (iact[i] > meq && ((!reverse_step && rv[i] > 0.) || (reverse_step && rv[i] < 0.))) {
+                    double temp = uv[i] / fabs(rv[i]);
+                    if (t1inf) {
                         t1inf = 0;
                         t1 = temp;
                         idel = i + 1;
@@ -285,7 +273,7 @@ int qpgen2_(double *G, double *av, int n,
             double t2, ztn;
             if (!t2inf) {
                 ztn = dot(n, zv, &C[(iadd - 1) * n]);
-                t2 = -slack / ztn;
+                t2 = fabs(slack) / ztn;
             }
 
             if (t1inf && t2inf) {
@@ -295,7 +283,8 @@ int qpgen2_(double *G, double *av, int n,
 
             // We will take a full step if t2 <= t1.
             int full_step = !t2inf && (t1inf || t1 >= t2);
-            double step = full_step ? t2 : t1;
+            double step_length = full_step ? t2 : t1;
+            double step = reverse_step ? -step_length : step_length;
 
             if (!t2inf) {
                 // Update primal variable
@@ -327,19 +316,7 @@ int qpgen2_(double *G, double *av, int n,
             if (!t2inf) {
                 // We took a step in primal space, but only took a partial step.
                 // So we need to update the slack variable that we are currently bringing to zero.
-
-                double temp = dot(n, xv, &C[(iadd - 1) * n]) - bv[iadd - 1];
-                if (iadd > meq) {
-                    slack = temp;
-                } else {
-                    slack = -fabs(temp);
-                    if (temp > 0.) {
-                        for (int j = 0; j < n; j++) {
-                            C[j + (iadd - 1) * n] = -C[j + (iadd - 1) * n];
-                        }
-                        bv[iadd - 1] = -bv[iadd - 1];
-                    }
-                }
+                slack = dot(n, xv, &C[(iadd - 1) * n]) - bv[iadd - 1];
             }
         }
 
