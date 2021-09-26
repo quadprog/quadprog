@@ -19,6 +19,8 @@ double sqrt(double);
 
 void axpy(int n, double a, double x[], double y[]);
 double dot(int n, double x[], double y[]);
+void triangular_multiply(int n, double a[], double b[]);
+void triangular_multiply_transpose(int n, double a[], double b[]);
 void triangular_solve(int n, double a[], double b[]);
 void triangular_solve_transpose(int n, double a[], double b[]);
 void triangular_invert(int n, double a[]);
@@ -70,7 +72,7 @@ double calculate_vsmall() {
  *
  * meq    the number of equality constraints, 0 <= meq <= q.
  *
- * work   an array of length >= 2n + 2q + (r+2)*(r+3)/2 - 1, where r = min(n, q)
+ * work   an array of length >= 2n + 2q + r*(r+5)/2, where r = min(n, q)
  *        for storage of intermediate values
  *
  * factorized   whether G itself or its inverted factor R^-1 is passed in the G parameter.
@@ -115,10 +117,10 @@ int qpgen2_(double *G, double *av, int n,
     double *zv = dv + n;
     double *rv = zv + n;
     double *uv = rv + r;
-    double *R = uv + r + 1;
+    double *R = uv + r;
     double *sv = R + r * (r + 1) / 2;
     double *nbv = sv + q;
-    int work_length = n + n + r + (r + 1) + r * (r + 1) / 2 + q + q;
+    int work_length = n + n + r + r + r * (r + 1) / 2 + q + q;
 
     for (int i = 0; i < work_length; i++) {
         work[i] = 0.;
@@ -143,25 +145,11 @@ int qpgen2_(double *G, double *av, int n,
         }
         triangular_solve_transpose(n, G, xv); // now xv contains L^-1 a
         triangular_solve(n, G, xv);           // now xv contains L^-T L^-1 a = G^-1 a
-        triangular_invert(n, G);               // now G contains L^-T
+        triangular_invert(n, G);              // now G contains L^-T
     } else {
         // G is already L^-T
-
-        // multiply xv by L^-T
-        for (int j = n - 1; j >= 0; j--) {
-            xv[j] *= G[j + j * n];
-            for (int i = 0; i < j; i++) {
-                xv[j] += G[i + j * n] * xv[i];
-            }
-        }
-
-        // multiply xv by L^-1
-        for (int j = 0; j < n; j++) {
-            xv[j] *= G[j + j * n];
-            for (int i = j + 1; i < n; i++) {
-                xv[j] += G[j + i * n] * xv[i];
-            }
-        }
+        triangular_multiply_transpose(n, G, xv); // now xv contains L^-1 a
+        triangular_multiply(n, G, xv);           // now xv contains L^-T L^-1 a = G^-1 a
     }
 
     double *J = G;
@@ -264,14 +252,12 @@ int qpgen2_(double *G, double *av, int n,
 
             // Set rv = R^-1 d_1. This is (the negative of) the step direction for the dual variable uv.
 
+            for (int i = 0; i < *nact; i++) {
+                rv[i] = dv[i];
+            }
             for (int i = *nact - 1; i >= 0; i--) {
-                double temp = dv[i];
-                int k = 0;
-                for (int j = i + 1; j < *nact; j++) {
-                    temp -= R[(i + 2) * (i + 3) / 2 - 2 + k] * rv[j];
-                    k += j + 1;
-                }
-                rv[i] = temp / R[(i + 1) * (i + 2) / 2 - 1];
+                rv[i] /= R[(i + 1) * (i + 2) / 2 - 1];
+                axpy(i, -rv[i], &R[i * (i + 1) / 2], rv);
             }
 
             // Find the largest step length t1 before dual feasibility is violated.
@@ -336,7 +322,7 @@ int qpgen2_(double *G, double *av, int n,
             }
             uv[*nact - 1] = uv[*nact];
             uv[*nact] = 0.;
-            iact[*nact-1] = 0;
+            iact[*nact - 1] = 0;
             --(*nact);
 
             if (!t2inf) {

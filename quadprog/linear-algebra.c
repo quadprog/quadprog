@@ -1,3 +1,5 @@
+double sqrt(double);
+
 void axpy(int n, double a, double x[], double y[])
 {
     for (int i = 0; i < n; i++) {
@@ -22,6 +24,28 @@ void scal(int n, double a, double x[])
 }
 
 /*
+ * Compute a * b, where a is upper triangular.
+ * The result is written into b.
+ */
+void triangular_multiply(int n, double a[], double b[]) {
+    for (int j = 0; j < n; j++) {
+        axpy(j, b[j], &a[j * n], b);
+        b[j] *= a[j + j * n];
+    }
+}
+
+/*
+ * Compute transpose(a) * b, where a is upper triangular.
+ * The result is written into b.
+ */
+void triangular_multiply_transpose(int n, double a[], double b[]) {
+    for (int j = n - 1; j >= 0; j--) {
+        b[j] *= a[j + j * n];
+        b[j] += dot(j, b, &a[j * n]);
+    }
+}
+
+/*
  * Solve a * x = b, where a is upper triangular.
  * The solution is written into b.
  */
@@ -38,7 +62,8 @@ void triangular_solve(int n, double a[], double b[]) {
  */
 void triangular_solve_transpose(int n, double a[], double b[]) {
     for (int k = 0; k < n; k++) {
-        b[k] = (b[k] - dot(k, &a[k * n], b)) / a[k + k * n];
+        b[k] -= dot(k, &a[k * n], b);
+        b[k] /= a[k + k * n];
     }
 }
 
