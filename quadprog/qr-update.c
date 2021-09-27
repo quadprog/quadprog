@@ -1,9 +1,9 @@
 double hypot(double, double);
 
 /*
- * Use orthogonal transformations to bring the components of a beyond the rth to zero
+ * Apply orthogonal transformations to a to bring the components beyond the rth to zero.
  * Append the result to R as a final column.
- * Apply the same orthogonal transformations to the rows of Q.
+ * Apply the same orthogonal transformations to the columns of Q.
  *
  * Note that R is an (r-1) by (r-1) upper triangular matrix stored as packed columns.
  * So the input size is (r-1)*r/2 and the output size is r*(r+1)/2.
@@ -55,8 +55,8 @@ void qr_insert(int n, int r, double a[], double Q[], double R[]) {
 
 /*
  * Drop the col-th column of R.
- * Use orthogonal transformations to restore R to upper triangular form.
- * Apply the same orthogonal transformations to the rows of Q.
+ * Apply orthogonal transformations to the rows of R to restore R to upper triangular form.
+ * Apply the same orthogonal transformations to the columns of Q.
  *
  * Note that R is an r by r upper triangular matrix stored as packed columns.
  * So the input size is r*(r+1)/2 and the output size is (r-1)*r/2.
