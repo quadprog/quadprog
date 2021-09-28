@@ -233,6 +233,8 @@ int qpgen2_(double *G, double *av, int n,
 
         double slack = sv[iadd - 1];
 
+        double u = 0;
+
         for (; ; (*pIterPartial)++) {
             // Set dv = J^T n, where n is the column of C corresponding to the constraint
             // that we are adding to the active set.
@@ -302,12 +304,12 @@ int qpgen2_(double *G, double *av, int n,
                 axpy(n, step, zv, xv);
 
                 // Update objective value
-                *obj += step * ztn * (step / 2. + uv[*nact]);
+                *obj += step * ztn * (step / 2. + u);
             }
 
             // Update dual variable
             axpy(*nact, -step, rv, uv);
-            uv[*nact] += step;
+            u += step;
 
             if (full_step) {
                 break;
@@ -320,8 +322,7 @@ int qpgen2_(double *G, double *av, int n,
                 uv[i - 1] = uv[i];
                 iact[i - 1] = iact[i];
             }
-            uv[*nact - 1] = uv[*nact];
-            uv[*nact] = 0.;
+            uv[*nact - 1] = 0.;
             iact[*nact - 1] = 0;
             --(*nact);
 
@@ -347,6 +348,7 @@ int qpgen2_(double *G, double *av, int n,
         // Add constraint iadd to the active set.
 
         ++(*nact);
+        uv[*nact - 1] = u;
         iact[*nact - 1] = iadd;
         qr_insert(n, *nact, dv, J, R);
     }
