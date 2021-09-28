@@ -36,7 +36,7 @@ extensions = [Extension('quadprog', [
 
 setup(
     name="quadprog",
-    version="0.1.9",
+    version="0.1.10",
     description="Quadratic Programming Solver",
     long_description=long_description,
     url="https://github.com/quadprog/quadprog",
