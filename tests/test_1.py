@@ -10,17 +10,13 @@ def solve_qp_scipy(G, a, C, b, meq):
 
     constraints = []
     if C is not None:
-        constraints += [{
-            'type': 'ineq',
+        constraints = [{
+            'type': 'eq' if i < meq else 'ineq',
             'fun': lambda x, C=C, b=b, i=i: (np.dot(C.T, x) - b)[i]
         } for i in range(C.shape[1])]
-        constraints += [{
-            'type': 'ineq',
-            'fun': lambda x, C=C, b=b, i=i: -(np.dot(C.T, x) - b)[i]
-        } for i in range(meq)]
 
     result = scipy.optimize.minimize(
-        f, x0=np.zeros(len(G)), method='COBYLA', constraints=constraints,
+        f, x0=np.zeros(len(G)), method='SLSQP', constraints=constraints,
         tol=1e-10, options={'maxiter': 2000})
     return result
 
