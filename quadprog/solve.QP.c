@@ -270,11 +270,9 @@ int qpgen2_(double *G, double *av, int n,
             for (int i = 0; i < *nact; i++) {
                 if (iact[i] > meq && rv[i] > 0.) {
                     double temp = uv[i] / rv[i];
-                    if (t1inf) {
+                    if (t1inf || temp < t1) {
                         t1inf = 0;
                         t1 = temp;
-                        idel = i + 1;
-                    } else if (temp < t1) {
                         idel = i + 1;
                     }
                 }
