@@ -103,3 +103,24 @@ def test_4():
     b = y + random.rand(n) - 0.5
 
     verify(G, a, C, b)
+
+
+def test_5():
+    # This test exercises two important cases:
+    # - the active set reaching maximum size (number of variables) without being optimal
+    # - a large number of constraints dropped in a single step
+
+    m = 10
+    n = 2*m
+
+    z = np.array([1.0, -1.0] * m) + 1e-3 * np.random.RandomState(1).randn(n) * 1e-3
+
+    G = np.identity(n)
+    a = np.zeros(n)
+    C = np.vstack([np.identity(n), z]).T
+    b = np.array([1.0] * n + [1.01])
+
+    xf, f, xu, iters, lagr, iact = solve_qp(G, a, C, b)
+    np.testing.assert_array_equal(iters, [n+2, m])
+
+    verify(G, a, C, b)
