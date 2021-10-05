@@ -1,0 +1,4 @@
+include quadprog/linear-algebra.c
+include quadprog/qr-update.c
+include quadprog/solve.QP.c
+include quadprog/quadprog.pyx

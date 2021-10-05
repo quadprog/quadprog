@@ -1,3 +1,4 @@
+from Cython.Build import cythonize
 from setuptools import setup, Extension
 
 long_description = """Minimize     1/2 x^T G x - a^T x
@@ -27,12 +28,19 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Mathematics"
 ]
 
-extensions = [Extension('quadprog', [
-    'quadprog/linear-algebra.c',
-    'quadprog/qr-update.c',
-    'quadprog/quadprog.c',
-    'quadprog/solve.QP.c',
-])]
+ext_modules=cythonize(
+    [
+        Extension(
+            "quadprog",
+            [
+                'quadprog/linear-algebra.c',
+                'quadprog/qr-update.c',
+                'quadprog/solve.QP.c',
+                'quadprog/quadprog.pyx',
+            ],
+        )
+    ],
+)
 
 setup(
     name="quadprog",
@@ -44,6 +52,14 @@ setup(
     author_email='rmcgibbo@gmail.com',
     license='GPLv2+',
     classifiers=classifiers,
-    ext_modules=extensions,
-    install_requires=["numpy"]
+    ext_modules=ext_modules,
+    install_requires=["numpy"],
+    package_data= {
+        "quadprog": [
+            'quadprog/linear-algebra.c',
+            'quadprog/qr-update.c',
+            'quadprog/solve.QP.c',
+            'quadprog/quadprog.pyx',
+            ]
+        }
 )
