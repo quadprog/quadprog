@@ -4,3 +4,4 @@ quadprog.so
 quadprog.egg-info/
 dist/
 tests/__pycache__/
+/.tox
