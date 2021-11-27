@@ -151,3 +151,22 @@ def test_6():
     np.testing.assert_array_almost_equal(f, 0.0393038880729888)
 
     verify(G, a, C, b, meq)
+
+
+def test_7():
+    # test case from https://github.com/quadprog/quadprog/issues/32#issuecomment-978001128
+
+    G = np.array([
+        [224.60560028, 181.38561347, 299.23703769],
+        [181.38561347, 148.05984179, 238.58321617],
+        [299.23703769, 238.58321617, 406.34542188]
+    ])
+    a = np.array([239.91135277, 196.08680183, 313.40206452])
+    C = np.array([
+        [-1.,  1.,  1.,  0.,  0.],
+        [-1.,  1.,  0.,  1.,  0.],
+        [-1.,  1.,  0.,  0.,  1.]
+    ])
+    b = np.array([-1.19, 0.7, 0., 0., 0.])
+
+    verify(G, a, C, b)
