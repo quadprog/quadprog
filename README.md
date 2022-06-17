@@ -18,7 +18,7 @@ References
 ```
 
 ### Installation
-`pip install quadprog`
+`pip install quadprog-wheel`
 
 ### Dependencies
 - Runtime

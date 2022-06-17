@@ -25,6 +25,7 @@ classifiers = [
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
     "Topic :: Scientific/Engineering :: Mathematics"
 ]
 
@@ -43,9 +44,9 @@ ext_modules=cythonize(
 )
 
 setup(
-    name="quadprog",
+    name="quadprog-wheel",
     version="0.1.11",
-    description="Quadratic Programming Solver",
+    description="Quadratic Programming Solver with wheel packages",
     long_description=long_description,
     url="https://github.com/quadprog/quadprog",
     author="Robert T. McGibbon",
@@ -53,13 +54,6 @@ setup(
     license='GPLv2+',
     classifiers=classifiers,
     ext_modules=ext_modules,
+    python_requires=">=3.6, <3.11",
     install_requires=["numpy"],
-    package_data= {
-        "quadprog": [
-            'quadprog/linear-algebra.c',
-            'quadprog/qr-update.c',
-            'quadprog/solve.QP.c',
-            'quadprog/quadprog.pyx',
-            ]
-        }
 )
