@@ -1,0 +1,35 @@
+on:
+  workflow_dispatch:
+
+jobs:
+  build-wheel:
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os:
+          - ubuntu-20.04
+          - windows-2019
+          - macos-10.15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Build and test wheels
+        uses: pypa/cibuildwheel@v2.6.1
+        env:
+          # Disable building for PyPy, 32bit
+          CIBW_SKIP: pp* *-win32 *-manylinux_i686 *-musllinux*
+
+          CIBW_BEFORE_BUILD: pip install -r requirements_develop.txt && python -m cython quadprog/quadprog.pyx
+
+          CIBW_BEFORE_TEST: pip install -r requirements_test.txt
+          CIBW_TEST_COMMAND: pytest {project}/tests
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v2
+        with:
+          name: wheels
+          path: wheelhouse/quadprog*.whl
