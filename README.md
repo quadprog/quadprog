@@ -24,7 +24,9 @@ References
 - Runtime
    - `numpy`
 - Installation
-   - `numpy`, C compiler.
+   - `numpy`
+   - C compiler if installing from sdist
+   - `Cython` if building from source
 
 ### Developing
 
