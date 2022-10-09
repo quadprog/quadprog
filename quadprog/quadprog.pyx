@@ -38,8 +38,8 @@ def solve_qp(double[:, :] G, double[:] a, double[:, :] C=None, double[:] b=None,
         the first meq constraints are treated as equality constraints,
         all further as inequality constraints (defaults to 0).
     factorized : bool, default=False
-        If True, then we are passing :math:`R^{−1}` (where :math:`G = R^T R`)
-        instead of the matrix G in the argument G.
+        If True, then we are passing :math:`R^{−1}` instead of the matrix G
+        in the argument G, where :math:`G = R^T R` and R is upper triangular.
 
     Returns
     -------
