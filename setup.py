@@ -1,5 +1,4 @@
 from setuptools import setup, Extension
-
 long_description = """Minimize     1/2 x^T G x - a^T x
 
 Subject to   C.T x >= b
@@ -24,19 +23,21 @@ classifiers = [
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering :: Mathematics"
 ]
 
 extensions = [Extension('quadprog', [
     'quadprog/linear-algebra.c',
     'quadprog/qr-update.c',
-    'quadprog/quadprog.c',
+    'quadprog/quadprog.pyx',
     'quadprog/solve.QP.c',
 ])]
 
 setup(
     name="quadprog",
-    version="0.1.11",
+    version="0.1.12",
     description="Quadratic Programming Solver",
     long_description=long_description,
     url="https://github.com/quadprog/quadprog",
