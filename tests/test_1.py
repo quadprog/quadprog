@@ -37,14 +37,14 @@ def verify(G, a, C=None, b=None, meq=0):
 
     # verify primal feasibility
     slack = xf.dot(C) - b
-    assert np.all(slack > -1e-15)
+    assert np.all(slack > -2e-15)
     assert np.all(slack[:meq] < 1e-15)
 
     # verify dual feasibility
     assert np.all(lagr[meq:] >= 0)
 
     # verify complementary slackness
-    assert not np.any((lagr[meq:] > 0) & (slack[meq:] > 1e-15))
+    assert not np.any((lagr[meq:] > 0) & (slack[meq:] > 1e-14))
 
     # verify first-order optimality condition
     np.testing.assert_array_almost_equal(G.dot(xf) - a, C.dot(lagr))

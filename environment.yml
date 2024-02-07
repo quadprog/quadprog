@@ -1,0 +1,8 @@
+name: quadprog
+channels:
+  - conda-forge
+dependencies:
+  - numpy
+  - pip
+  - pytest
+  - scipy

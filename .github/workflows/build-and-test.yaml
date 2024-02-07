@@ -1,72 +1,67 @@
 on:
   push:
+    branches: [master]
   pull_request:
-    branches:
-      - master
+    branches: [master]
   workflow_dispatch:
 
+defaults:
+  run:
+    shell: bash -l {0}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9
-
-      - name: Install pip and development dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements_develop.txt
-
-      - name: Build package
-        run: |
-          python -m cython quadprog/quadprog.pyx
-          python -m build --sdist
-
-      - name: Upload package
-        uses: actions/upload-artifact@v2
-        with:
-          name: sdist
-          path: dist/quadprog*.tar.gz
-
-  test:
-    needs: build
-
-    runs-on: ubuntu-latest
+  build_wheels:
+    name: Build wheels
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        python-version: [3.6, 3.7, 3.8, 3.9]
-
+        os: [ubuntu-20.04, windows-2019, macos-11, macos-14]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.16.5
+        env:
+          # Disable building for PyPy, 32bit
+          CIBW_SKIP: pp* *-win32 *-manylinux_i686 *-musllinux*
+          CIBW_BEFORE_TEST: pip install -r requirements_test.txt
+          CIBW_TEST_COMMAND: pytest {project}/tests
+
+      - uses: actions/upload-artifact@v3
         with:
-          python-version: ${{ matrix.python-version }}
+          path: ./wheelhouse/*.whl
+          retention-days: 1
 
-      - name: Install pip and test dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements_test.txt
+  run_tests:
+    needs: [build_wheels]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest, macos-14]
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Download package
-        uses: actions/download-artifact@v2
+      - uses: mamba-org/setup-micromamba@v1
         with:
-          name: sdist
+          environment-file: environment.yml
+          create-args: python=${{ matrix.python-version }}
+          cache-environment: true
+
+      - name: Download wheels
+        uses: actions/download-artifact@v3
+        with:
+          name: artifact
           path: dist
 
       - name: Install package
-        run: |
-          pip install dist/quadprog*.tar.gz
+        run: pip install --no-index --find-links dist quadprog
 
       - name: Run tests
-        run: |
-          pytest
+        run: pytest
