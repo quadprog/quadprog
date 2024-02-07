@@ -1,8 +1,6 @@
 on:
   push:
     tags: ['v*']
-  pull_request:
-    branches: [master]
 
 jobs:
   build_wheels:
@@ -48,7 +46,6 @@ jobs:
           path: ./dist/*.tar.gz
 
   upload_to_pypi:
-    if: false
     name: Upload to PyPI
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
