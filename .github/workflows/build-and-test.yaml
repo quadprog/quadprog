@@ -5,6 +5,10 @@ on:
     branches: [master]
   workflow_dispatch:
 
+defaults:
+  run:
+    shell: bash -l {0}
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -39,48 +43,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [macos-latest, ubuntu-latest, windows-latest, macos-14]
         python-version: ['3.8', '3.9', '3.10', '3.11']
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v4
+      - uses: mamba-org/setup-micromamba@v1
         with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
-
-      - name: Install dependencies
-        run: pip install numpy && pip install -r requirements_test.txt
-
-      - name: Download wheels
-        uses: actions/download-artifact@v3
-        with:
-          name: artifact
-          path: dist
-
-      - name: Install package
-        run: pip install --no-index --find-links dist quadprog
-
-      - name: Run tests
-        run: pytest
-
-  run_tests_macosarm64:
-    needs: [build_wheels]
-    runs-on: macos-14
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.10', '3.11']
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
-
-      - name: Install dependencies
-        run: pip install numpy && pip install -r requirements_test.txt
+          environment-file: environment.yml
+          create-args: python=${{ matrix.python-version }}
+          cache-environment: true
 
       - name: Download wheels
         uses: actions/download-artifact@v3
