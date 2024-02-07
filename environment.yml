@@ -5,3 +5,4 @@ dependencies:
   - numpy
   - pip
   - pytest
+  - scipy
