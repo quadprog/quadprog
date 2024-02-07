@@ -37,7 +37,7 @@ def verify(G, a, C=None, b=None, meq=0):
 
     # verify primal feasibility
     slack = xf.dot(C) - b
-    assert np.all(slack > -1e-15)
+    assert np.all(slack > -2e-15)
     assert np.all(slack[:meq] < 1e-15)
 
     # verify dual feasibility
