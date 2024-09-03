@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, windows-2019, macos-11, macos-14]
+        os: [ubuntu-latest, windows-latest, macos-13, macos-14]
     steps:
       - uses: actions/checkout@v4
 
@@ -31,37 +31,3 @@ jobs:
           CIBW_SKIP: pp* *-win32 *-manylinux_i686 *-musllinux*
           CIBW_BEFORE_TEST: pip install -r requirements_test.txt
           CIBW_TEST_COMMAND: pytest {project}/tests
-
-      - uses: actions/upload-artifact@v3
-        with:
-          path: ./wheelhouse/*.whl
-          retention-days: 1
-
-  run_tests:
-    needs: [build_wheels]
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest, macos-14]
-        python-version: ['3.8', '3.9', '3.10', '3.11']
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: mamba-org/setup-micromamba@v1
-        with:
-          environment-file: environment.yml
-          create-args: python=${{ matrix.python-version }}
-          cache-environment: true
-
-      - name: Download wheels
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: artifact
-          path: dist
-
-      - name: Install package
-        run: pip install --no-index --find-links dist quadprog
-
-      - name: Run tests
-        run: pytest
