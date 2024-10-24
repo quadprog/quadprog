@@ -37,8 +37,8 @@ extensions = [Extension('quadprog', [
 
 setup(
     name="quadprog",
-    version="0.1.12",
-    python_requires=">=3.8",
+    version="0.1.13",
+    python_requires=">=3.9",
     description="Quadratic Programming Solver",
     long_description=long_description,
     url="https://github.com/quadprog/quadprog",
