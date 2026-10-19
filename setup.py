@@ -1,3 +1,5 @@
+import sys
+
 from setuptools import setup, Extension
 
 long_description = """Minimize     1/2 x^T G x - a^T x
@@ -28,12 +30,17 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Mathematics"
 ]
 
+# The C helpers (dot, axpy, cholesky, ...) have generic names: hide them, so
+# that a library loaded in the same process and exporting the same names cannot
+# take their place. Only the module init function stays visible.
+extra_compile_args = [] if sys.platform == "win32" else ["-fvisibility=hidden"]
+
 extensions = [Extension('quadprog', [
     'quadprog/linear-algebra.c',
     'quadprog/qr-update.c',
     'quadprog/quadprog.pyx',
     'quadprog/solve.QP.c',
-])]
+], extra_compile_args=extra_compile_args)]
 
 setup(
     name="quadprog",
