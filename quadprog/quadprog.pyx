@@ -15,7 +15,7 @@ def solve_qp(double[:, :] G, double[:] a, double[:, :] C=None, double[:] b=None,
     Minimize     1/2 x^T G x - a^T x
     Subject to   C.T x >= b
 
-    This routine uses the the Goldfarb/Idnani dual algorithm [1].
+    This routine uses the Goldfarb/Idnani dual algorithm [1].
 
     References
     ---------
@@ -54,7 +54,7 @@ def solve_qp(double[:, :] G, double[:] a, double[:, :] C=None, double[:] b=None,
         algorithm needed, the second indicates how often constraints became
         inactive after becoming active first.
     lagrangian : array, shape=(m,)
-        vector with the Lagragian at the solution.
+        vector with the Lagrangian at the solution.
     iact : array
         vector with the indices of the active constraints at the solution.
     """
@@ -69,7 +69,7 @@ def solve_qp(double[:, :] G, double[:] a, double[:, :] C=None, double[:] b=None,
 
     n3, m1 = C.shape[0], C.shape[1]
     if n1 != n2:
-        raise ValueError('G must be a square matrix. Receive shape=(%d,%d)' % (n1, n2))
+        raise ValueError('G must be a square matrix. Received shape=(%d,%d)' % (n1, n2))
     if len(a) != n1:
         raise ValueError('G and a must have the same dimension. Received G as (%d,%d) and a as (%d,)' % (n1, n2, len(a)))
     if n1 != n3:

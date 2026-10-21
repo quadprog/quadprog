@@ -4,7 +4,7 @@ long_description = """Minimize     1/2 x^T G x - a^T x
 
 Subject to   C.T x >= b
 
-This routine uses the the Goldfarb/Idnani dual algorithm [1].
+This routine uses the Goldfarb/Idnani dual algorithm [1].
 
 References
 ----------

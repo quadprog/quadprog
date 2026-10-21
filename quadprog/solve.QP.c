@@ -5,7 +5,7 @@
  *  subject to   C1^T x  = b1
  *               C2^T x >= b2
 
- *  This routine uses the the Goldfarb/Idnani dual algorithm [1].
+ *  This routine uses the Goldfarb/Idnani dual algorithm [1].
 
  *  References
  *  ---------
